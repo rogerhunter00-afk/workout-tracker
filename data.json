@@ -89,29 +89,31 @@
           "weight": 0,
           "targetReps": 10,
           "sets": [
-            5
-          ]
+            10
+          ],
+          "bodyweight": true
         },
         {
           "name": "Gymnast Tucks",
           "weight": 0,
           "targetReps": 10,
           "sets": [
-            5
+            10
           ],
           "bodyweight": true
         },
         {
           "name": "Lat Pulldown",
-          "weight": 0,
+          "weight": 32,
           "targetReps": 5,
           "sets": [
-            null,
-            null,
-            null,
-            null,
-            null
-          ]
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "bodyweight": false
         }
       ]
     }
