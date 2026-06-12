@@ -721,11 +721,17 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<"
 function summariseDay(k){
   const wk = DATA.workouts[k];
   if(!wk){ return "No workout logged for "+prettyDate(k); }
+  let totalSets=0, doneSets=0, totalReps=0;
   let out = wk.label+" — "+prettyDate(k)+"\n";
   wk.exercises.forEach(ex=>{
-    const reps = ex.sets.filter(v=>v!==null);
-    out += ex.name+" "+loadLabel(ex)+": "+(reps.length?reps.join(" "):"—")+"\n";
+    const done = ex.sets.filter(v=>v!==null);
+    const reps = done.reduce((a,b)=>a+b,0);
+    totalSets += ex.sets.length; doneSets += done.length; totalReps += reps;
+    const setStr = ex.sets.length ? ex.sets.map(v=>v===null?"–":v).join(" ") : "—";
+    const tally = ex.sets.length ? "  ("+done.length+"/"+ex.sets.length+" sets"+(reps?", "+reps+" reps":"")+")" : "";
+    out += ex.name+" "+loadLabel(ex)+": "+setStr+tally+"\n";
   });
+  out += "\nTotal: "+doneSets+"/"+totalSets+" sets"+(totalReps?", "+totalReps+" reps":"")+(doneSets===totalSets&&totalSets>0?" — complete":"");
   return out.trim();
 }
 
