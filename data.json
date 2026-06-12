@@ -98,7 +98,8 @@
           "targetReps": 10,
           "sets": [
             5
-          ]
+          ],
+          "bodyweight": true
         },
         {
           "name": "Lat Pulldown",
