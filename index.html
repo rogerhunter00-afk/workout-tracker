@@ -24,13 +24,16 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
+  /* html backdrop must match the theme — iOS shows it on rubber-band
+     overscroll and behind the translucent Safari toolbar */
+  html{background:var(--bg2);}
   body{
     background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
-    background-attachment:fixed;
     color:var(--cream);
     font-family:"Barlow",system-ui,-apple-system,sans-serif;
     font-size:17px; line-height:1.4;
     min-height:100vh;
+    min-height:100dvh;
     padding-bottom:calc(28px + var(--safe-b));
   }
   h1,h2,h3,.disp{font-family:"Barlow Condensed",sans-serif;letter-spacing:.3px;}
@@ -76,10 +79,21 @@
   .finish-btn:active{background:var(--surface2);transform:scale(.96);}
   .finish-btn.done{background:var(--sage);color:#20251a;border-color:var(--sage);}
 
+  /* ---- Day progress ---- */
+  .day-progress{display:flex;align-items:center;gap:12px;margin:-6px 0 20px;}
+  .day-progress .bar{flex:1;height:5px;border-radius:99px;background:var(--surface);border:1px solid var(--line);overflow:hidden;}
+  .day-progress .bar i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,var(--clay-deep),var(--clay) 60%,var(--ochre));
+    transition:width .35s ease;}
+  .day-progress.complete .bar i{background:var(--sage);}
+  .day-progress .count{font-family:"Barlow Condensed";font-weight:600;font-size:14px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;white-space:nowrap;}
+
   /* ---- Exercise ---- */
   .exercise{margin-bottom:26px;}
   .ex-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px;cursor:pointer;}
   .ex-name{font-family:"Barlow Condensed";font-weight:700;font-size:27px;color:var(--cream);line-height:1;}
+  .ex-check{color:var(--sage);font-size:20px;margin-left:6px;opacity:0;transform:scale(.5);display:inline-block;transition:.25s;}
+  .ex-check.show{opacity:1;transform:scale(1);}
   .ex-scheme{font-family:"Barlow Condensed";font-weight:600;font-size:20px;color:var(--tan);white-space:nowrap;display:flex;align-items:center;gap:6px;}
   .ex-scheme .chev{color:var(--clay);}
   .ex-scheme b{color:var(--cream);font-weight:700;}
@@ -103,6 +117,8 @@
     background:radial-gradient(circle at 35% 30%, #c98f5f, #a9663f 55%, #834d2c);
     border-color:#a9663f;
   }
+  @keyframes pop{0%{transform:scale(.8);}55%{transform:scale(1.1);}100%{transform:scale(1);}}
+  .rep.pop{animation:pop .28s ease;}
   .setctl{display:flex;flex-direction:column;gap:6px;margin-left:2px;}
   .mini{
     width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
@@ -144,6 +160,9 @@
     border:1px solid var(--line2);color:var(--cream);font-size:16px;font-family:inherit;
   }
   .field input:focus{outline:none;border-color:var(--clay);}
+  .seg{display:flex;gap:4px;background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:4px;}
+  .seg-btn{flex:1;padding:10px 8px;border-radius:9px;font-family:"Barlow Condensed";font-weight:600;font-size:16px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);transition:.15s;}
+  .seg-btn.on{background:var(--clay);color:#fff;}
   .row2{display:flex;gap:12px;}
   .row2 .field{flex:1;}
   .btn{
@@ -182,6 +201,16 @@
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--dim);}
   .sync-dot.on{background:var(--sage);}
   .sync-dot.off{background:var(--clay);}
+
+  /* ---- End mark ---- */
+  .endmark{
+    text-align:center;margin-top:42px;
+    font-family:"Barlow Condensed";font-weight:700;font-size:12px;
+    letter-spacing:4px;text-transform:uppercase;color:var(--dim);opacity:.55;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+  }
+  .endmark::before,.endmark::after{content:"";height:1px;width:34px;background:var(--line2);}
+  .endmark b{color:var(--clay);font-weight:700;}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
 </style>
 </head>
@@ -221,10 +250,18 @@
     <button class="finish-btn" id="finishBtn">Finish</button>
   </div>
 
+  <!-- Session progress -->
+  <div class="day-progress" id="dayProgress">
+    <div class="bar"><i id="dayBarFill"></i></div>
+    <span class="count" id="dayCount">0/0 sets</span>
+  </div>
+
   <!-- Exercises -->
   <main id="exList"></main>
 
   <button class="add-ex" id="addEx">+ Add exercise</button>
+
+  <footer class="endmark">Strong<b>room</b></footer>
 </div>
 
 <!-- Toast -->
@@ -287,10 +324,16 @@
 <div class="overlay" id="ovEx">
   <div class="sheet">
     <h2 id="exEditTitle">Edit exercise</h2>
-    <p class="muted">Name, working weight, and number of sets.</p>
+    <p class="muted">Name, load, sets and target reps.</p>
     <div class="field"><label>Exercise name</label><input id="exName" placeholder="Squat" /></div>
+    <div class="field"><label>Load</label>
+      <div class="seg" id="exType">
+        <button type="button" class="seg-btn" data-v="w">Weighted</button>
+        <button type="button" class="seg-btn" data-v="bw">Bodyweight</button>
+      </div>
+    </div>
     <div class="row2">
-      <div class="field"><label>Weight</label><input id="exWeight" type="number" inputmode="decimal" placeholder="220" /></div>
+      <div class="field" id="weightField"><label>Weight</label><input id="exWeight" type="number" inputmode="decimal" placeholder="220" /></div>
       <div class="field"><label>Sets</label><input id="exSets" type="number" inputmode="numeric" placeholder="5" /></div>
     </div>
     <div class="field"><label>Target reps</label><input id="exReps" type="number" inputmode="numeric" placeholder="5" /></div>
@@ -381,7 +424,7 @@ function ensureDay(k){
     DATA.workouts[k] = {
       label:"Workout A",
       exercises: DATA.templates.map(t=>({
-        name:t.name, weight:t.weight, targetReps:t.targetReps||5,
+        name:t.name, weight:t.weight, targetReps:t.targetReps||5, bodyweight:!!t.bodyweight,
         sets: Array.from({length:t.sets||5}, ()=>null)
       }))
     };
@@ -450,8 +493,11 @@ function setSyncStatus(ok,msg){
   }
 }
 
-// ---- rep cycling: null -> 5 -> 4 -> 3 -> 2 -> 1 -> null ----
-function cycleRep(v){ if(v===null||v===undefined) return 5; if(v<=1) return null; return v-1; }
+// ---- rep cycling: null -> targetReps -> targetReps-1 -> … -> 1 -> null ----
+function cycleRep(v, target){ if(v===null||v===undefined) return target||5; if(v<=1) return null; return v-1; }
+
+// ---- load label: "220lb" or "BW" for bodyweight exercises ----
+function loadLabel(ex){ return ex.bodyweight ? "BW" : ex.weight + DATA.settings.units; }
 
 // ============================================================
 //  RENDER
@@ -477,10 +523,13 @@ function render(){
 
     const head = document.createElement("div");
     head.className = "ex-head";
-    head.innerHTML = `<div class="ex-name">${escapeHtml(ex.name)}</div>
-      <div class="ex-scheme"><b>${ex.sets.length}×${ex.targetReps}</b> ${ex.weight}${DATA.settings.units} <span class="chev">›</span></div>`;
+    head.innerHTML = `<div class="ex-name">${escapeHtml(ex.name)}<span class="ex-check">✓</span></div>
+      <div class="ex-scheme"><b>${ex.sets.length}×${ex.targetReps}</b> ${loadLabel(ex)} <span class="chev">›</span></div>`;
     head.addEventListener("click", ()=>openExEdit(ei));
     card.appendChild(head);
+    const check = head.querySelector(".ex-check");
+    const refreshCheck = ()=> check.classList.toggle("show", ex.sets.length>0 && ex.sets.every(v=>v!==null));
+    refreshCheck();
 
     const sets = document.createElement("div");
     sets.className = "sets";
@@ -490,9 +539,15 @@ function render(){
       b.textContent = val===null ? "" : val;
       b.addEventListener("click",(e)=>{
         e.stopPropagation();
-        ex.sets[si] = cycleRep(ex.sets[si]);
+        ex.sets[si] = cycleRep(ex.sets[si], ex.targetReps);
         b.textContent = ex.sets[si]===null?"":ex.sets[si];
         b.className = "rep" + (ex.sets[si]!==null ? (ex.sets[si]<=Math.ceil(ex.targetReps/2)?" filled low":" filled") : "");
+        if(ex.sets[si]!==null){
+          b.classList.add("pop");
+          b.addEventListener("animationend", ()=>b.classList.remove("pop"), {once:true});
+        }
+        refreshCheck();
+        updateProgress();
         save("log "+ex.name);
       });
       sets.appendChild(b);
@@ -512,6 +567,20 @@ function render(){
     card.appendChild(sets);
     list.appendChild(card);
   });
+
+  updateProgress();
+}
+
+// ---- session progress bar ----
+function updateProgress(){
+  const wk = ensureDay(cur);
+  let total=0, done=0;
+  wk.exercises.forEach(ex=>{ total+=ex.sets.length; done+=ex.sets.filter(v=>v!==null).length; });
+  const wrap = el("dayProgress");
+  wrap.style.display = total ? "" : "none";
+  el("dayBarFill").style.width = total ? (100*done/total)+"%" : "0%";
+  el("dayCount").textContent = done+"/"+total+" sets";
+  wrap.classList.toggle("complete", total>0 && done===total);
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -525,7 +594,7 @@ function summariseDay(k){
   let out = wk.label+" — "+prettyDate(k)+"\n";
   wk.exercises.forEach(ex=>{
     const reps = ex.sets.filter(v=>v!==null);
-    out += ex.name+" "+ex.weight+DATA.settings.units+": "+(reps.length?reps.join(" "):"—")+"\n";
+    out += ex.name+" "+loadLabel(ex)+": "+(reps.length?reps.join(" "):"—")+"\n";
   });
   return out.trim();
 }
@@ -547,21 +616,31 @@ function buildReport(){
     DATA.workouts[k].exercises.forEach(ex=>{
       const done = ex.sets.filter(v=>v!==null);
       if(!done.length) return;
-      (byEx[ex.name] ||= []).push({date:k, weight:ex.weight, sets:done, vol:done.reduce((a,b)=>a+b,0)*ex.weight});
+      const reps = done.reduce((a,b)=>a+b,0);
+      (byEx[ex.name] ||= []).push({date:k, weight:ex.weight, bw:!!ex.bodyweight, sets:done, reps, vol:ex.bodyweight?0:reps*ex.weight});
     });
   });
   Object.keys(byEx).forEach(name=>{
     const hist = byEx[name];
     const last = hist[hist.length-1];
-    const first = hist[0];
-    const best = Math.max(...hist.map(h=>h.weight));
-    const totalVol = hist.reduce((a,h)=>a+h.vol,0);
-    const delta = last.weight - first.weight;
+    const isBW = hist.every(h=>h.bw);
     out += name.toUpperCase()+"\n";
-    out += "  Latest:  "+last.weight+u+"  "+last.sets.join(" ")+"  ("+shortDate(last.date)+")\n";
-    out += "  Best:    "+best+u+"\n";
-    out += "  Change:  "+(delta>=0?"+":"")+delta+u+" over "+hist.length+" session"+(hist.length>1?"s":"")+"\n";
-    out += "  Volume:  "+totalVol.toLocaleString()+" "+u+" total\n\n";
+    out += "  Latest:  "+(last.bw?"BW":last.weight+u)+"  "+last.sets.join(" ")+"  ("+shortDate(last.date)+")\n";
+    if(isBW){
+      const bestReps = Math.max(...hist.map(h=>Math.max(...h.sets)));
+      const totalReps = hist.reduce((a,h)=>a+h.reps,0);
+      out += "  Best set: "+bestReps+" reps\n";
+      out += "  Volume:  "+totalReps.toLocaleString()+" reps over "+hist.length+" session"+(hist.length>1?"s":"")+"\n\n";
+    } else {
+      const weighted = hist.filter(h=>!h.bw);
+      const first = weighted[0];
+      const best = Math.max(...weighted.map(h=>h.weight));
+      const totalVol = hist.reduce((a,h)=>a+h.vol,0);
+      const delta = weighted[weighted.length-1].weight - first.weight;
+      out += "  Best:    "+best+u+"\n";
+      out += "  Change:  "+(delta>=0?"+":"")+delta+u+" over "+hist.length+" session"+(hist.length>1?"s":"")+"\n";
+      out += "  Volume:  "+totalVol.toLocaleString()+" "+u+" total\n\n";
+    }
   });
 
   // session log
@@ -636,8 +715,20 @@ function openExEdit(ei){
   el("exWeight").value = ex.weight;
   el("exSets").value = ex.sets.length;
   el("exReps").value = ex.targetReps;
+  setEditType(ex.bodyweight ? "bw" : "w");
   open("ovEx");
 }
+
+// weighted / bodyweight toggle in the edit sheet
+let editType = "w";
+function setEditType(v){
+  editType = v;
+  document.querySelectorAll("#exType .seg-btn").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
+  el("weightField").style.display = (v==="bw") ? "none" : "";
+}
+document.querySelectorAll("#exType .seg-btn").forEach(b=>{
+  b.addEventListener("click", ()=>setEditType(b.dataset.v));
+});
 
 // ============================================================
 //  EVENTS
@@ -658,7 +749,7 @@ el("finishBtn").onclick=function(){ this.classList.toggle("done"); this.textCont
 
 el("addEx").onclick=()=>{
   const wk=ensureDay(cur);
-  wk.exercises.push({name:"New exercise", weight:0, targetReps:5, sets:[null,null,null,null,null]});
+  wk.exercises.push({name:"New exercise", weight:0, bodyweight:false, targetReps:5, sets:[null,null,null,null,null]});
   save("add exercise"); render();
   openExEdit(wk.exercises.length-1);
 };
@@ -667,14 +758,15 @@ el("addEx").onclick=()=>{
 el("exSave").onclick=()=>{
   const wk=ensureDay(cur); const ex=wk.exercises[editingIdx];
   ex.name=(el("exName").value||"Exercise").trim();
-  ex.weight=Number(el("exWeight").value)||0;
+  ex.bodyweight=(editType==="bw");
+  ex.weight=ex.bodyweight ? 0 : (Number(el("exWeight").value)||0);
   ex.targetReps=Math.max(1,Number(el("exReps").value)||5);
   const n=Math.max(1,Number(el("exSets").value)||5);
   while(ex.sets.length<n) ex.sets.push(null);
   while(ex.sets.length>n) ex.sets.pop();
   // also update template so future days inherit it
   const t=DATA.templates.find(t=>t.name===ex.name);
-  if(t){ t.weight=ex.weight; t.sets=n; t.targetReps=ex.targetReps; }
+  if(t){ t.weight=ex.weight; t.sets=n; t.targetReps=ex.targetReps; t.bodyweight=ex.bodyweight; }
   closeAll(); save("edit exercise"); render();
 };
 el("exCancel").onclick=closeAll;
