@@ -82,7 +82,8 @@
           "sets": [
             7,
             7
-          ]
+          ],
+          "bodyweight": true
         },
         {
           "name": "Roman Chair Leg Raises",
