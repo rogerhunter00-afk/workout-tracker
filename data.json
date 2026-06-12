@@ -116,6 +116,50 @@
           "bodyweight": false
         }
       ]
+    },
+    "2026-06-13": {
+      "label": "Workout A",
+      "exercises": [
+        {
+          "name": "Squat",
+          "weight": 220,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Bench Press",
+          "weight": 140,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Barbell Row",
+          "weight": 130,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ]
     }
   }
 }
