@@ -200,6 +200,16 @@
   .sync-dot.on{background:var(--sage);}
   .sync-dot.off{background:var(--clay);}
   .sheet a{color:var(--ochre);text-decoration:none;border-bottom:1px solid var(--line2);}
+  /* ---- Template rows ---- */
+  .routine-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .rr-main{flex:1;min-width:0;text-align:left;background:var(--bg2);border:1px solid var(--line2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;transition:.15s;}
+  .rr-main:active{transform:scale(.99);background:var(--surface2);}
+  .rr-name{font-family:"Barlow Condensed";font-weight:700;font-size:18px;color:var(--cream);letter-spacing:.3px;}
+  .rr-sub{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;}
+  .routine-row.active .rr-main{border-color:var(--clay);}
+  .rr-del{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:var(--dim);background:var(--bg2);border:1px solid var(--line2);transition:.15s;}
+  .rr-del:active{transform:scale(.92);color:var(--danger);border-color:var(--danger);}
+  .rr-del svg{width:18px;height:18px;}
   .btn-ghost.on{border-color:var(--clay);color:var(--clay-soft);}
   .bk-error{color:var(--danger);font-size:13.5px;margin:12px 0 0;}
 
@@ -360,15 +370,32 @@
   </div>
 </div>
 
-<!-- ===== Label edit ===== -->
-<div class="overlay" id="ovLabel">
+<!-- ===== Session / templates ===== -->
+<div class="overlay" id="ovSession">
   <div class="sheet">
-    <h2>Session name</h2>
-    <p class="muted">e.g. Workout A, Push Day, Legs.</p>
-    <div class="field"><input id="labelInput" placeholder="Workout A" /></div>
+    <h2>Session</h2>
+    <p class="muted">Apply a saved template to this day, or save this day as a new one.</p>
+
+    <p class="seclabel">Templates</p>
+    <div id="routineList"></div>
+
+    <div class="divider"></div>
+    <p class="seclabel">Save this day as a template</p>
+    <div class="field"><input id="newTemplateName" placeholder="e.g. Workout B, Push Day" autocomplete="off" /></div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="labelSave">Save</button>
-      <button class="btn btn-ghost" id="labelCancel">Cancel</button>
+      <button class="btn btn-sage" id="saveAsTemplate">Save template</button>
+    </div>
+
+    <div class="divider"></div>
+    <p class="seclabel">Rename just this day</p>
+    <div class="field"><input id="labelInput" placeholder="Workout A" autocomplete="off" /></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="labelSave">Rename this day</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="closeSession">Close</button>
     </div>
   </div>
 </div>
@@ -401,18 +428,17 @@ function todayKey(){ return keyOf(new Date()); }
 function prettyDate(k){ const d=parseKey(k); return DOW[d.getDay()]+", "+d.getDate()+" "+MON[d.getMonth()]+" "+d.getFullYear(); }
 function shortDate(k){ const d=parseKey(k); return d.getDate()+" "+MON[d.getMonth()]; }
 
+// ---- ids for saved routines (templates) ----
+function rid(){ return "r"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
 // ---- default seed (mirrors a StrongLifts A session) ----
 function seed(){
-  return {
-    version:1,
-    settings:{ units:"lb" },
-    templates:[
-      {name:"Squat", weight:220, sets:5, targetReps:5},
-      {name:"Bench Press", weight:140, sets:5, targetReps:5},
-      {name:"Barbell Row", weight:130, sets:5, targetReps:5}
-    ],
-    workouts:{}
-  };
+  const r = {id:rid(), name:"Workout A", exercises:[
+    {name:"Squat", weight:220, sets:5, targetReps:5},
+    {name:"Bench Press", weight:140, sets:5, targetReps:5},
+    {name:"Barbell Row", weight:130, sets:5, targetReps:5}
+  ]};
+  return { version:2, settings:{units:"lb"}, routines:[r], lastRoutineId:r.id, workouts:{} };
 }
 
 // ---- app state ----
@@ -436,18 +462,94 @@ function toast(msg){
   clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove("show"), 2200);
 }
 
-// ---- ensure a workout object exists for a day (seeded from templates) ----
+// ---- routines (saved workout templates) ----
+// Self-heals v1 data (a flat `templates` list) and any merge into a routine set.
+function ensureRoutines(){
+  if(!Array.isArray(DATA.routines) || DATA.routines.length===0){
+    const ex = (DATA.templates||[]).map(t=>({
+      name:t.name, weight:t.weight||0, sets:t.sets||5, targetReps:t.targetReps||5, bodyweight:!!t.bodyweight
+    }));
+    DATA.routines = [{id:rid(), name:"Workout A", exercises:ex}];
+  }
+  if(!DATA.lastRoutineId || !DATA.routines.some(r=>r.id===DATA.lastRoutineId)){
+    DATA.lastRoutineId = DATA.routines[0].id;
+  }
+}
+function routineById(id){ return (DATA.routines||[]).find(r=>r.id===id); }
+function defaultRoutine(){ ensureRoutines(); return routineById(DATA.lastRoutineId) || DATA.routines[0]; }
+// fresh, unlogged exercises from a routine's definition
+function exFromRoutine(r){
+  return r.exercises.map(t=>({
+    name:t.name, weight:t.weight||0, targetReps:t.targetReps||5, bodyweight:!!t.bodyweight,
+    sets: Array.from({length:t.sets||5}, ()=>null)
+  }));
+}
+
+// ---- ensure a workout object exists for a day (seeded from the last-used routine) ----
 function ensureDay(k){
   if(!DATA.workouts[k]){
+    const r = defaultRoutine();
     DATA.workouts[k] = {
-      label:"Workout A",
-      exercises: DATA.templates.map(t=>({
-        name:t.name, weight:t.weight, targetReps:t.targetReps||5, bodyweight:!!t.bodyweight,
-        sets: Array.from({length:t.sets||5}, ()=>null)
-      }))
+      label: r ? r.name : "Workout",
+      routineId: r ? r.id : null,
+      exercises: r ? exFromRoutine(r) : []
     };
   }
   return DATA.workouts[k];
+}
+
+// ---- apply / save / delete templates ----
+function applyRoutine(id){
+  const r = routineById(id); if(!r) return;
+  const wk = ensureDay(cur);
+  if(filledSets(wk)>0 && !confirm('Replace this day with "'+r.name+'"? Reps logged for this day will be cleared.')) return;
+  wk.label = r.name; wk.routineId = r.id; wk.exercises = exFromRoutine(r);
+  DATA.lastRoutineId = r.id;
+  closeAll(); save("apply "+r.name); render();
+  toast("Applied "+r.name);
+}
+function saveDayAsTemplate(){
+  const name = (el("newTemplateName").value||"").trim();
+  if(!name){ toast("Name the template first"); return; }
+  const wk = ensureDay(cur);
+  if(!wk.exercises.length){ toast("Add an exercise first"); return; }
+  const r = {id:rid(), name, exercises: wk.exercises.map(ex=>({
+    name:ex.name, weight:ex.weight, sets:ex.sets.length, targetReps:ex.targetReps, bodyweight:!!ex.bodyweight
+  }))};
+  DATA.routines.push(r);
+  wk.routineId = r.id; wk.label = name; DATA.lastRoutineId = r.id;
+  el("newTemplateName").value = "";
+  save("new template "+name); render(); renderRoutines();
+  toast('Saved template "'+name+'"');
+}
+function deleteRoutine(id){
+  const r = routineById(id); if(!r) return;
+  if(DATA.routines.length<=1){ toast("Keep at least one template"); return; }
+  if(!confirm('Delete template "'+r.name+'"? Days you\'ve already logged keep their exercises.')) return;
+  DATA.routines = DATA.routines.filter(x=>x.id!==id);
+  if(DATA.lastRoutineId===id) DATA.lastRoutineId = DATA.routines[0].id;
+  save("delete template"); renderRoutines();
+  toast("Deleted "+r.name);
+}
+function renderRoutines(){
+  const wrap = el("routineList"); if(!wrap) return;
+  ensureRoutines();
+  wrap.innerHTML = "";
+  const curId = (DATA.workouts[cur]||{}).routineId;
+  DATA.routines.forEach(r=>{
+    const row = document.createElement("div");
+    row.className = "routine-row"+(r.id===curId?" active":"");
+    const main = document.createElement("button");
+    main.className = "rr-main";
+    main.innerHTML = `<span class="rr-name">${escapeHtml(r.name)}</span><span class="rr-sub">${r.exercises.length} exercise${r.exercises.length===1?"":"s"}${r.id===curId?" · on this day":""}</span>`;
+    main.addEventListener("click", ()=>applyRoutine(r.id));
+    const del = document.createElement("button");
+    del.className = "rr-del"; del.title = "Delete template";
+    del.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>`;
+    del.addEventListener("click",(e)=>{ e.stopPropagation(); deleteRoutine(r.id); });
+    row.appendChild(main); row.appendChild(del);
+    wrap.appendChild(row);
+  });
 }
 
 // ---- persistence: local-first; the GitHub backup is async and debounced ----
@@ -509,7 +611,14 @@ function mergeData(local, remote){
   if(!remote) return local;
   const out = JSON.parse(JSON.stringify(remote));
   out.settings = local.settings;
-  out.templates = local.templates;
+  // union routines by id so neither device loses a template it created
+  const byId = {};
+  (remote.routines||[]).forEach(r=>byId[r.id]=r);
+  (local.routines||[]).forEach(r=>byId[r.id]=r);
+  const merged = Object.values(byId);
+  if(merged.length) out.routines = merged;
+  out.lastRoutineId = local.lastRoutineId || remote.lastRoutineId;
+  delete out.templates;
   Object.keys(local.workouts||{}).forEach(k=>{
     const r = out.workouts[k];
     if(!r || filledSets(local.workouts[k]) >= filledSets(r)) out.workouts[k] = local.workouts[k];
@@ -900,18 +1009,19 @@ el("exSave").onclick=()=>{
   const n=Math.max(1,Number(el("exSets").value)||5);
   while(ex.sets.length<n) ex.sets.push(null);
   while(ex.sets.length>n) ex.sets.pop();
-  // also update template so future days inherit it
-  const t=DATA.templates.find(t=>t.name===ex.name);
-  if(t){ t.weight=ex.weight; t.sets=n; t.targetReps=ex.targetReps; t.bodyweight=ex.bodyweight; }
+  // propagate the change to this day's template so future days inherit it
+  const r=routineById(wk.routineId);
+  if(r){ const t=r.exercises.find(e=>e.name===ex.name); if(t){ t.weight=ex.weight; t.sets=n; t.targetReps=ex.targetReps; t.bodyweight=ex.bodyweight; } }
   closeAll(); save("edit exercise"); render();
 };
 el("exCancel").onclick=closeAll;
 el("exDelete").onclick=()=>{ const wk=ensureDay(cur); wk.exercises.splice(editingIdx,1); closeAll(); save("remove exercise"); render(); };
 
-// label edit
-el("wkLabel").onclick=()=>{ el("labelInput").value=ensureDay(cur).label; open("ovLabel"); };
-el("labelSave").onclick=()=>{ ensureDay(cur).label=(el("labelInput").value||"Workout").trim(); closeAll(); save("rename"); render(); };
-el("labelCancel").onclick=closeAll;
+// session / templates
+el("wkLabel").onclick=()=>{ el("labelInput").value=ensureDay(cur).label; el("newTemplateName").value=""; renderRoutines(); open("ovSession"); };
+el("labelSave").onclick=()=>{ ensureDay(cur).label=(el("labelInput").value||"Workout").trim(); save("rename"); render(); toast("Renamed this day"); };
+el("saveAsTemplate").onclick=saveDayAsTemplate;
+el("closeSession").onclick=closeAll;
 
 // settings
 function renderUnits(){
@@ -941,6 +1051,7 @@ el("exportClip").onclick=()=>copyText(buildReport());
 el("exportPdf").onclick=exportPDF;
 
 // ---- boot ----
+ensureRoutines();   // migrate v1 (flat templates) data into a routine set
 render();
 renderBackup();
 // quietly refresh from the backup on launch if connected
