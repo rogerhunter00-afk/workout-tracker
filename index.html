@@ -711,6 +711,11 @@ function updateProgress(){
   el("dayBarFill").style.width = total ? (100*done/total)+"%" : "0%";
   el("dayCount").textContent = done+"/"+total+" sets";
   wrap.classList.toggle("complete", total>0 && done===total);
+
+  const fb = el("finishBtn");
+  const complete = total>0 && done===total;
+  fb.classList.toggle("done", complete);
+  fb.textContent = complete ? "Done ✓" : "Finish";
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -881,7 +886,7 @@ el("calPrev").onclick=()=>{ calMonth.setMonth(calMonth.getMonth()-1); renderCale
 el("calNext").onclick=()=>{ calMonth.setMonth(calMonth.getMonth()+1); renderCalendar(); };
 el("closeCal").onclick=closeAll;
 
-el("finishBtn").onclick=function(){ this.classList.toggle("done"); this.textContent=this.classList.contains("done")?"Done ✓":"Finish"; if(this.classList.contains("done")){ copyText(summariseDay(cur)); } };
+el("finishBtn").onclick=()=> copyText(summariseDay(cur));
 
 el("addEx").onclick=()=>{
   const wk=ensureDay(cur);
