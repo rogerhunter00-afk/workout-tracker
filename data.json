@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "settings": {
+    "units": "lb"
+  },
+  "templates": [
+    { "name": "Squat", "weight": 220, "sets": 5, "targetReps": 5 },
+    { "name": "Bench Press", "weight": 140, "sets": 5, "targetReps": 5 },
+    { "name": "Barbell Row", "weight": 130, "sets": 5, "targetReps": 5 }
+  ],
+  "workouts": {}
+}
