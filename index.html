@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#1c1813" />
+<link rel="manifest" href="manifest.json" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Strongroom" />
+<link rel="apple-touch-icon" href="icon-180.png" />
 <title>Strongroom — Workout Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -198,9 +204,12 @@
 
   .empty-state{text-align:center;color:var(--dim);padding:40px 10px;}
   .empty-state .big{font-family:"Barlow Condensed";font-size:22px;color:var(--tan);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
-  .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--dim);}
+  .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);margin-right:4px;}
   .sync-dot.on{background:var(--sage);}
   .sync-dot.off{background:var(--clay);}
+  .sheet a{color:var(--ochre);text-decoration:none;border-bottom:1px solid var(--line2);}
+  .btn-ghost.on{border-color:var(--clay);color:var(--clay-soft);}
+  .bk-error{color:var(--danger);font-size:13.5px;margin:12px 0 0;}
 
   /* ---- End mark ---- */
   .endmark{
@@ -271,19 +280,7 @@
 <div class="overlay" id="ovSettings">
   <div class="sheet">
     <h2>Settings</h2>
-    <p class="muted" id="syncStatus"><span class="sync-dot off" id="syncDot"></span> Not connected to GitHub</p>
 
-    <p class="seclabel">Sync &amp; storage</p>
-    <div class="field"><label>GitHub username</label><input id="cfgOwner" placeholder="rogerhunter00-afk" autocomplete="off" /></div>
-    <div class="field"><label>Repository name</label><input id="cfgRepo" placeholder="workout-tracker" autocomplete="off" /></div>
-    <div class="field"><label>Branch</label><input id="cfgBranch" placeholder="main" autocomplete="off" /></div>
-    <div class="field"><label>Personal access token (fine-grained, repo contents read/write)</label><input id="cfgToken" type="password" placeholder="github_pat_..." autocomplete="off" /></div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="saveCfg">Save &amp; sync</button>
-      <button class="btn btn-ghost" id="pullNow">Pull latest</button>
-    </div>
-
-    <div class="divider"></div>
     <p class="seclabel">Units</p>
     <div class="btn-row">
       <button class="btn btn-ghost" id="unitLb">Pounds (lb)</button>
@@ -297,6 +294,30 @@
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" id="exportPdf">Download PDF report</button>
+    </div>
+
+    <div class="divider"></div>
+    <p class="seclabel">Backup</p>
+
+    <div id="bkConnected" style="display:none">
+      <p class="muted" id="bkStatus" style="margin-bottom:14px"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="syncNow">Sync now</button>
+        <button class="btn btn-ghost" id="disconnectBtn">Disconnect</button>
+      </div>
+    </div>
+
+    <div id="bkSetup" style="display:none">
+      <p class="muted">Your log is saved on this device. Connect GitHub once and it backs itself up automatically from then on.
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token ›</a>
+      (fine-grained, only this repository, Contents read &amp; write), then paste it below.</p>
+      <div class="row2" id="repoFields" style="display:none">
+        <div class="field"><label>Repo owner</label><input id="cfgOwner" placeholder="username" autocomplete="off" /></div>
+        <div class="field"><label>Repo name</label><input id="cfgRepo" placeholder="repository" autocomplete="off" /></div>
+      </div>
+      <div class="field"><label>Access token</label><input id="cfgToken" type="password" placeholder="Paste token here" autocomplete="off" /></div>
+      <button class="btn btn-primary" id="connectBtn">Connect</button>
+      <p class="bk-error" id="bkError" style="display:none"></p>
     </div>
 
     <div class="divider"></div>
@@ -364,7 +385,9 @@
 "use strict";
 /* ============================================================
    Strongroom — personal workout tracker
-   Storage: GitHub repo data.json (via API) + local cache.
+   Storage: local-first (localStorage is the source of truth);
+   optional GitHub backup mirrors it to data.json in this repo,
+   debounced so a session is one commit, not one per tap.
    Falls back to in-memory if browser storage is unavailable.
    ============================================================ */
 
@@ -404,6 +427,9 @@ function seed(){
 let DATA = store.get("wt_data") || seed();
 let CFG  = store.get("wt_cfg")  || {owner:"",repo:"",branch:"main",token:""};
 let SHA  = store.get("wt_sha")  || null;       // github file sha for updates
+let dirty = !!store.get("wt_dirty");           // local changes not yet backed up
+let lastSync = store.get("wt_lastsync") || null;
+let lastSyncError = null;
 let cur  = todayKey();                          // current day key
 let calMonth = new Date();                       // calendar view month
 let editingIdx = null;                           // exercise being edited
@@ -432,64 +458,189 @@ function ensureDay(k){
   return DATA.workouts[k];
 }
 
-// ---- persistence ----
+// ---- persistence: local-first; the GitHub backup is async and debounced ----
 function persistLocal(){ store.set("wt_data", DATA); }
-async function save(reason){
+let pushTimer = null, pushReasons = [];
+function save(reason){
   persistLocal();
-  if(CFG.owner && CFG.repo && CFG.token){ await push(reason||"update"); }
+  dirty = true; store.set("wt_dirty", true);
+  if(!isConfigured()) return;
+  if(reason) pushReasons.push(reason);
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>flushPush(), 4000);  // batch a burst of taps into one commit
 }
+async function flushPush(opts){
+  clearTimeout(pushTimer); pushTimer = null;
+  if(!isConfigured() || !dirty) return;
+  let msg = pushReasons[0] || "update";
+  if(pushReasons.length>1) msg += " (+"+(pushReasons.length-1)+" more)";
+  pushReasons = [];
+  await push(msg, opts);
+}
+// flush a pending backup when the app is closed or backgrounded;
+// refresh from the repo when coming back to the foreground
+addEventListener("pagehide", ()=>{ flushPush({keepalive:true}); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){ flushPush({keepalive:true}); }
+  else if(isConfigured() && !dirty){ pullRemote(true); }
+});
 
-// ---- GitHub API ----
+// ---- GitHub backup ----
+function isConfigured(){ return !!(CFG.owner && CFG.repo && CFG.token); }
 function ghHeaders(){ return {Authorization:"Bearer "+CFG.token, Accept:"application/vnd.github+json"}; }
 function ghUrl(){ return `https://api.github.com/repos/${CFG.owner}/${CFG.repo}/contents/data.json`; }
 function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
 function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
 
-async function pull(){
-  if(!(CFG.owner&&CFG.repo&&CFG.token)){ toast("Add GitHub details first"); return; }
-  try{
-    const r = await fetch(ghUrl()+"?ref="+(CFG.branch||"main")+"&t="+Date.now(), {headers:ghHeaders()});
-    if(r.status===404){ toast("No data.json yet — will create on save"); SHA=null; store.set("wt_sha",null); return; }
-    if(!r.ok){ throw new Error("HTTP "+r.status); }
-    const j = await r.json();
-    SHA = j.sha; store.set("wt_sha", SHA);
-    DATA = JSON.parse(b64decode(j.content));
-    persistLocal();
-    setSyncStatus(true);
-    render();
-    toast("Pulled latest from GitHub");
-  }catch(e){ setSyncStatus(false,e.message); toast("Pull failed: "+e.message); }
+// The app is served from <owner>.github.io/<repo>/ — read both straight off the URL
+function detectRepo(){
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  if(!m) return null;
+  const seg = location.pathname.split("/").filter(Boolean);
+  return {owner:m[1], repo: seg.length ? seg[0] : m[1]+".github.io"};
 }
 
-async function push(reason){
+async function fetchRemote(){
+  const r = await fetch(ghUrl()+"?ref="+(CFG.branch||"main")+"&t="+Date.now(), {headers:ghHeaders()});
+  if(r.status===404) return {sha:null, data:null};
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const j = await r.json();
+  return {sha:j.sha, data:JSON.parse(b64decode(j.content))};
+}
+
+function filledSets(wk){ return wk.exercises.reduce((a,ex)=>a+ex.sets.filter(v=>v!==null).length,0); }
+function hasLocalLog(){ return Object.keys(DATA.workouts).some(k=>filledSets(DATA.workouts[k])>0); }
+
+// day-level merge so a conflict never loses a logged day from either side;
+// per day the copy with more logged sets wins (ties go to this device)
+function mergeData(local, remote){
+  if(!remote) return local;
+  const out = JSON.parse(JSON.stringify(remote));
+  out.settings = local.settings;
+  out.templates = local.templates;
+  Object.keys(local.workouts||{}).forEach(k=>{
+    const r = out.workouts[k];
+    if(!r || filledSets(local.workouts[k]) >= filledSets(r)) out.workouts[k] = local.workouts[k];
+  });
+  return out;
+}
+
+async function pullRemote(silent){
+  if(!isConfigured()) return false;
+  try{
+    const remote = await fetchRemote();
+    SHA = remote.sha; store.set("wt_sha", SHA);
+    if(remote.data){
+      DATA = (dirty || hasLocalLog()) ? mergeData(DATA, remote.data) : remote.data;
+      persistLocal(); render();
+    }
+    lastSyncError = null;
+    renderBackup();
+    if(!silent) toast("Up to date");
+    return true;
+  }catch(e){
+    lastSyncError = e.message; renderBackup();
+    if(!silent) toast("Couldn't reach GitHub");
+    return false;
+  }
+}
+
+async function push(message, opts, isRetry){
+  if(!isConfigured()) return false;
   try{
     const body = {
-      message:"workout: "+(reason||"update")+" ("+todayKey()+")",
+      message:"workout: "+(message||"update")+" ("+todayKey()+")",
       content: b64encode(JSON.stringify(DATA,null,2)),
       branch: CFG.branch||"main"
     };
     if(SHA) body.sha = SHA;
-    const r = await fetch(ghUrl(), {method:"PUT", headers:ghHeaders(), body:JSON.stringify(body)});
-    if(!r.ok){
-      // sha conflict — refetch sha once and retry
-      if(r.status===409 || r.status===422){ await pull(); return; }
-      throw new Error("HTTP "+r.status);
+    const r = await fetch(ghUrl(), {method:"PUT", headers:ghHeaders(), body:JSON.stringify(body), keepalive:!!(opts&&opts.keepalive)});
+    if(r.status===409 || r.status===422){
+      if(isRetry) throw new Error("conflict");
+      // another device pushed first — fold its copy in, then retry once
+      const remote = await fetchRemote();
+      SHA = remote.sha; store.set("wt_sha", SHA);
+      if(remote.data){ DATA = mergeData(DATA, remote.data); persistLocal(); render(); }
+      return push(message, opts, true);
     }
+    if(!r.ok) throw new Error("HTTP "+r.status);
     const j = await r.json();
     SHA = j.content.sha; store.set("wt_sha", SHA);
-    setSyncStatus(true);
-  }catch(e){ setSyncStatus(false,e.message); toast("Sync failed (saved locally)"); }
+    dirty = false; store.set("wt_dirty", false);
+    lastSync = Date.now(); store.set("wt_lastsync", lastSync);
+    lastSyncError = null;
+    renderBackup();
+    return true;
+  }catch(e){
+    // data is already safe locally; the Backup status row surfaces the issue
+    lastSyncError = e.message;
+    renderBackup();
+    return false;
+  }
 }
 
-function setSyncStatus(ok,msg){
-  const dot = el("syncDot"), st = el("syncStatus");
-  if(!dot) return;
-  if(CFG.owner&&CFG.repo&&CFG.token){
-    dot.className = "sync-dot "+(ok?"on":"off");
-    st.innerHTML = `<span class="sync-dot ${ok?'on':'off'}"></span> ${ok?'Synced to '+CFG.owner+'/'+CFG.repo : 'Connection issue'+(msg?': '+msg:'')}`;
+// ---- backup section UI ----
+function relTime(ts){
+  const s = Math.floor((Date.now()-ts)/1000);
+  if(s<60) return "just now";
+  if(s<3600) return Math.floor(s/60)+" min ago";
+  if(s<86400) return Math.floor(s/3600)+" h ago";
+  return shortDate(keyOf(new Date(ts)));
+}
+function renderBackup(){
+  const con = el("bkConnected"), setup = el("bkSetup");
+  if(!con) return;
+  if(isConfigured()){
+    con.style.display=""; setup.style.display="none";
+    const st = el("bkStatus");
+    if(lastSyncError){
+      st.innerHTML = `<span class="sync-dot off"></span> Backup issue — your log is saved on this device and will retry.`;
+    } else if(dirty){
+      st.innerHTML = `<span class="sync-dot"></span> Backing up to ${escapeHtml(CFG.owner+"/"+CFG.repo)}…`;
+    } else {
+      st.innerHTML = `<span class="sync-dot on"></span> Backed up to ${escapeHtml(CFG.owner+"/"+CFG.repo)}${lastSync?" · "+relTime(lastSync):""}`;
+    }
   } else {
-    dot.className="sync-dot off";
-    st.innerHTML = `<span class="sync-dot off"></span> Not connected to GitHub`;
+    con.style.display="none"; setup.style.display="";
+    el("repoFields").style.display = detectRepo() ? "none" : "";
+  }
+}
+function bkError(msg){
+  const e = el("bkError");
+  if(msg){ e.textContent = msg; e.style.display = ""; }
+  else e.style.display = "none";
+}
+
+async function connectGitHub(){
+  bkError(null);
+  const det = detectRepo();
+  const owner = det ? det.owner : el("cfgOwner").value.trim();
+  const repo  = det ? det.repo  : el("cfgRepo").value.trim();
+  const token = el("cfgToken").value.trim();
+  if(!token){ bkError("Paste a token first."); return; }
+  if(!owner || !repo){ bkError("Enter the repo owner and name."); return; }
+  const btn = el("connectBtn"); btn.disabled = true; btn.textContent = "Connecting…";
+  try{
+    let r;
+    try{
+      r = await fetch(`https://api.github.com/repos/${owner}/${repo}`,
+        {headers:{Authorization:"Bearer "+token, Accept:"application/vnd.github+json"}});
+    }catch(_){ bkError("Couldn't reach GitHub — check your connection and try again."); return; }
+    if(r.status===401){ bkError("GitHub rejected the token — check it was copied in full and hasn't expired."); return; }
+    if(r.status===403){ bkError("The token doesn't have access to "+owner+"/"+repo+" — grant it this repository."); return; }
+    if(r.status===404){ bkError("Couldn't see "+owner+"/"+repo+" with this token — when creating it, select this repository under Repository access."); return; }
+    if(!r.ok){ bkError("GitHub error (HTTP "+r.status+") — try again in a moment."); return; }
+    const info = await r.json();
+    if(info.permissions && !info.permissions.push){ bkError("The token can only read — it needs Contents read & write."); return; }
+    CFG = {owner, repo, branch:(info.default_branch||"main"), token};
+    store.set("wt_cfg", CFG);
+    await pullRemote(true);          // adopt or merge any existing backup
+    await push("connect backup");    // make sure the backup exists and is current
+    el("cfgToken").value = "";
+    renderBackup();
+    toast("Connected — your log is backed up");
+  } finally {
+    btn.disabled = false; btn.textContent = "Connect";
   }
 }
 
@@ -739,7 +890,7 @@ el("dateCenter").onclick = ()=>{ calMonth = parseKey(cur); renderCalendar(); ope
 
 el("btnSummarise").onclick = ()=> copyText(summariseDay(cur));
 el("btnCalendar").onclick = ()=>{ calMonth=parseKey(cur); renderCalendar(); open("ovCal"); };
-el("btnSettings").onclick = ()=>{ fillCfg(); setSyncStatus(!!SHA); open("ovSettings"); };
+el("btnSettings").onclick = ()=>{ renderUnits(); renderBackup(); bkError(null); open("ovSettings"); };
 
 el("calPrev").onclick=()=>{ calMonth.setMonth(calMonth.getMonth()-1); renderCalendar(); };
 el("calNext").onclick=()=>{ calMonth.setMonth(calMonth.getMonth()+1); renderCalendar(); };
@@ -778,26 +929,37 @@ el("labelSave").onclick=()=>{ ensureDay(cur).label=(el("labelInput").value||"Wor
 el("labelCancel").onclick=closeAll;
 
 // settings
-function fillCfg(){ el("cfgOwner").value=CFG.owner; el("cfgRepo").value=CFG.repo; el("cfgBranch").value=CFG.branch||"main"; el("cfgToken").value=CFG.token; }
-el("saveCfg").onclick=async ()=>{
-  CFG={owner:el("cfgOwner").value.trim(),repo:el("cfgRepo").value.trim(),branch:(el("cfgBranch").value.trim()||"main"),token:el("cfgToken").value.trim()};
-  store.set("wt_cfg",CFG);
-  await pull();              // get any existing remote data + sha
-  await push("connect");    // ensure data.json exists
-  setSyncStatus(!!SHA);
+function renderUnits(){
+  el("unitLb").classList.toggle("on", DATA.settings.units==="lb");
+  el("unitKg").classList.toggle("on", DATA.settings.units==="kg");
+}
+el("connectBtn").onclick=connectGitHub;
+el("syncNow").onclick=async function(){
+  this.textContent="Syncing…"; this.disabled=true;
+  const ok = await pullRemote(true);
+  if(dirty) await flushPush();
+  this.textContent="Sync now"; this.disabled=false;
+  renderBackup();
+  toast(ok && !lastSyncError ? "Up to date" : "Couldn't reach GitHub — saved on this device");
 };
-el("pullNow").onclick=pull;
+el("disconnectBtn").onclick=()=>{
+  CFG={owner:"",repo:"",branch:"main",token:""}; store.set("wt_cfg",CFG);
+  SHA=null; store.set("wt_sha",null);
+  lastSyncError=null;
+  renderBackup();
+  toast("Disconnected — your log stays on this device");
+};
 el("closeSettings").onclick=closeAll;
-el("unitLb").onclick=()=>{ DATA.settings.units="lb"; save("units"); render(); toast("Units: lb"); };
-el("unitKg").onclick=()=>{ DATA.settings.units="kg"; save("units"); render(); toast("Units: kg"); };
+el("unitLb").onclick=()=>{ DATA.settings.units="lb"; save("units"); render(); renderUnits(); toast("Units: lb"); };
+el("unitKg").onclick=()=>{ DATA.settings.units="kg"; save("units"); render(); renderUnits(); toast("Units: kg"); };
 el("exportClip").onclick=()=>copyText(buildReport());
 el("exportPdf").onclick=exportPDF;
 
 // ---- boot ----
-setSyncStatus(!!SHA);
 render();
-// auto-pull on load if configured
-if(CFG.owner&&CFG.repo&&CFG.token){ pull(); }
+renderBackup();
+// quietly refresh from the backup on launch if connected
+if(isConfigured()){ pullRemote(true); }
 </script>
 </body>
 </html>
