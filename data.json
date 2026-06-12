@@ -3,29 +3,9 @@
   "settings": {
     "units": "kg"
   },
-  "templates": [
-    {
-      "name": "Squat",
-      "weight": 220,
-      "sets": 5,
-      "targetReps": 5
-    },
-    {
-      "name": "Bench Press",
-      "weight": 140,
-      "sets": 5,
-      "targetReps": 5
-    },
-    {
-      "name": "Barbell Row",
-      "weight": 130,
-      "sets": 5,
-      "targetReps": 5
-    }
-  ],
   "workouts": {
     "2026-06-12": {
-      "label": "Workout A",
+      "label": "Normal Day",
       "exercises": [
         {
           "name": "Seated Dumbbell Curls",
@@ -116,7 +96,8 @@
           ],
           "bodyweight": false
         }
-      ]
+      ],
+      "routineId": "rmqbcbvvgifec"
     },
     "2026-06-13": {
       "label": "Workout A",
@@ -162,5 +143,97 @@
         }
       ]
     }
-  }
+  },
+  "routines": [
+    {
+      "id": "rmqbcb1pufxf1",
+      "name": "Workout A",
+      "exercises": [
+        {
+          "name": "Squat",
+          "weight": 220,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        },
+        {
+          "name": "Bench Press",
+          "weight": 140,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        },
+        {
+          "name": "Barbell Row",
+          "weight": 130,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        }
+      ]
+    },
+    {
+      "id": "rmqbcbvvgifec",
+      "name": "Normal Day",
+      "exercises": [
+        {
+          "name": "Seated Dumbbell Curls",
+          "weight": 14,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        },
+        {
+          "name": "Cross-Body/Hammer Curls",
+          "weight": 14,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        },
+        {
+          "name": "Barbell Chest Press",
+          "weight": 14,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        },
+        {
+          "name": "Overhead Dumbbell Tricep Extensions",
+          "weight": 10,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        },
+        {
+          "name": "Roman Chair Dead-Hang Leg Raises",
+          "weight": 0,
+          "sets": 2,
+          "targetReps": 7,
+          "bodyweight": true
+        },
+        {
+          "name": "Roman Chair Leg Raises",
+          "weight": 0,
+          "sets": 1,
+          "targetReps": 10,
+          "bodyweight": true
+        },
+        {
+          "name": "Gymnast Tucks",
+          "weight": 0,
+          "sets": 1,
+          "targetReps": 10,
+          "bodyweight": true
+        },
+        {
+          "name": "Lat Pulldown",
+          "weight": 32,
+          "sets": 5,
+          "targetReps": 5,
+          "bodyweight": false
+        }
+      ]
+    }
+  ],
+  "lastRoutineId": "rmqbcbvvgifec"
 }
