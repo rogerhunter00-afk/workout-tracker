@@ -109,9 +109,11 @@
     font-family:"Barlow";font-weight:700;font-size:23px;
     background:transparent;border:2.5px solid var(--line2);color:var(--dim);
     transition:transform .12s ease, background .18s ease, border-color .18s ease, color .18s ease;
-    position:relative;user-select:none;
+    position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   }
   .rep:active{transform:scale(.88);}
+  /* slow shrink while a long-press (clear) is in progress */
+  .rep.holding{transform:scale(.78);transition:transform .5s ease;}
   .rep.filled{
     background:radial-gradient(circle at 35% 30%, var(--clay-soft), var(--clay) 55%, var(--clay-deep));
     border-color:var(--clay);color:#fff;
@@ -794,8 +796,32 @@ function render(){
       const b = document.createElement("button");
       b.className = repClass(val, ex.targetReps, complete);
       b.textContent = val===null ? "" : val;
+
+      // long-press (~500ms) clears the set in one go
+      let holdT = null, held = false;
+      const cancelHold = ()=>{ clearTimeout(holdT); holdT = null; b.classList.remove("holding"); };
+      b.addEventListener("pointerdown", ()=>{
+        if(ex.sets[si]===null) return;      // nothing to clear
+        b.classList.add("holding");
+        holdT = setTimeout(()=>{
+          held = true;
+          cancelHold();
+          const wasComplete = isDayComplete(wk);
+          ex.sets[si] = null;
+          save("clear set "+ex.name);
+          if(wasComplete){ render(); return; }   // greens revert together
+          b.textContent = "";
+          b.className = "rep pop";
+          b.addEventListener("animationend", ()=>b.classList.remove("pop"), {once:true});
+          updateProgress();
+        }, 500);
+      });
+      ["pointerup","pointercancel","pointerleave"].forEach(t=>b.addEventListener(t, cancelHold));
+      b.addEventListener("contextmenu", e=>e.preventDefault());
+
       b.addEventListener("click",(e)=>{
         e.stopPropagation();
+        if(held){ held = false; return; }   // this click belongs to the long-press
         const wasComplete = isDayComplete(wk);
         ex.sets[si] = cycleRep(ex.sets[si], ex.targetReps);
         const nowComplete = isDayComplete(wk);
