@@ -121,6 +121,12 @@
     background:radial-gradient(circle at 35% 30%, #c98f5f, #a9663f 55%, #834d2c);
     border-color:#a9663f;
   }
+  /* on a completed day, sets that hit target turn sage like the Done button */
+  .rep.goal{
+    background:radial-gradient(circle at 35% 30%, #a9b98a, var(--sage) 55%, #6d7c51);
+    border-color:var(--sage);color:#20251a;
+    box-shadow:inset 0 2px 6px rgba(255,255,255,.18), 0 3px 10px rgba(107,115,80,.35);
+  }
   @keyframes pop{0%{transform:scale(.8);}55%{transform:scale(1.1);}100%{transform:scale(1);}}
   .rep.pop{animation:pop .28s ease;}
 
@@ -769,6 +775,8 @@ function render(){
     list.innerHTML = `<div class="empty-state"><div class="big">No exercises</div>Add one below to start logging.</div>`;
   }
 
+  const complete = isDayComplete(wk);
+
   wk.exercises.forEach((ex,ei)=>{
     const card = document.createElement("div");
     card.className = "exercise";
@@ -784,13 +792,22 @@ function render(){
     sets.className = "sets";
     ex.sets.forEach((val,si)=>{
       const b = document.createElement("button");
-      b.className = "rep" + (val!==null ? (val<=Math.ceil(ex.targetReps/2)?" filled low":" filled") : "");
+      b.className = repClass(val, ex.targetReps, complete);
       b.textContent = val===null ? "" : val;
       b.addEventListener("click",(e)=>{
         e.stopPropagation();
+        const wasComplete = isDayComplete(wk);
         ex.sets[si] = cycleRep(ex.sets[si], ex.targetReps);
+        const nowComplete = isDayComplete(wk);
+        if(nowComplete !== wasComplete){
+          // day just crossed the finish line (or un-crossed it):
+          // repaint everything so target-hit sets flip to sage together
+          save("log "+ex.name);
+          render();
+          return;
+        }
         b.textContent = ex.sets[si]===null?"":ex.sets[si];
-        b.className = "rep" + (ex.sets[si]!==null ? (ex.sets[si]<=Math.ceil(ex.targetReps/2)?" filled low":" filled") : "");
+        b.className = repClass(ex.sets[si], ex.targetReps, nowComplete);
         if(ex.sets[si]!==null){
           b.classList.add("pop");
           b.addEventListener("animationend", ()=>b.classList.remove("pop"), {once:true});
@@ -808,6 +825,19 @@ function render(){
   });
 
   updateProgress();
+}
+
+// ---- rep ball styling ----
+function isDayComplete(wk){
+  let total=0, done=0;
+  wk.exercises.forEach(ex=>{ total+=ex.sets.length; done+=ex.sets.filter(v=>v!==null).length; });
+  return total>0 && done===total;
+}
+// on a completed day, sets that hit target go sage; under-target stay clay
+function repClass(v, target, dayComplete){
+  if(v===null || v===undefined) return "rep";
+  if(dayComplete && v>=target) return "rep filled goal";
+  return "rep filled" + (v<=Math.ceil(target/2) ? " low" : "");
 }
 
 // ---- session progress bar ----
