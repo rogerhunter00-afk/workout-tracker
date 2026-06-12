@@ -1,12 +1,118 @@
 {
   "version": 1,
   "settings": {
-    "units": "lb"
+    "units": "kg"
   },
   "templates": [
-    { "name": "Squat", "weight": 220, "sets": 5, "targetReps": 5 },
-    { "name": "Bench Press", "weight": 140, "sets": 5, "targetReps": 5 },
-    { "name": "Barbell Row", "weight": 130, "sets": 5, "targetReps": 5 }
+    {
+      "name": "Squat",
+      "weight": 220,
+      "sets": 5,
+      "targetReps": 5
+    },
+    {
+      "name": "Bench Press",
+      "weight": 140,
+      "sets": 5,
+      "targetReps": 5
+    },
+    {
+      "name": "Barbell Row",
+      "weight": 130,
+      "sets": 5,
+      "targetReps": 5
+    }
   ],
-  "workouts": {}
+  "workouts": {
+    "2026-06-12": {
+      "label": "Workout A",
+      "exercises": [
+        {
+          "name": "Seated Dumbbell Curls",
+          "weight": 14,
+          "targetReps": 5,
+          "sets": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        {
+          "name": "Cross-Body/Hammer Curls",
+          "weight": 14,
+          "targetReps": 5,
+          "sets": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        {
+          "name": "Barbell Chest Press",
+          "weight": 14,
+          "targetReps": 5,
+          "sets": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        {
+          "name": "Overhead Dumbbell Tricep Extensions",
+          "weight": 10,
+          "targetReps": 5,
+          "sets": [
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        },
+        {
+          "name": "Roman Chair Dead-Hang Leg Raises",
+          "weight": 0,
+          "targetReps": 7,
+          "sets": [
+            5,
+            5
+          ]
+        },
+        {
+          "name": "Roman Chair Leg Raises",
+          "weight": 0,
+          "targetReps": 10,
+          "sets": [
+            5
+          ]
+        },
+        {
+          "name": "Gymnast Tucks",
+          "weight": 0,
+          "targetReps": 10,
+          "sets": [
+            5
+          ]
+        },
+        {
+          "name": "Lat Pulldown",
+          "weight": 0,
+          "targetReps": 5,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ]
+    }
+  }
 }
