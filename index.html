@@ -28,7 +28,7 @@
     --safe-t:env(safe-area-inset-top,0px);
     --safe-b:env(safe-area-inset-bottom,0px);
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
   html,body{margin:0;padding:0;}
   /* html backdrop must match the theme — iOS shows it on rubber-band
      overscroll and behind the translucent Safari toolbar */
@@ -98,8 +98,6 @@
   .exercise{margin-bottom:26px;}
   .ex-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px;cursor:pointer;}
   .ex-name{font-family:"Barlow Condensed";font-weight:700;font-size:27px;color:var(--cream);line-height:1;}
-  .ex-check{color:var(--sage);font-size:20px;margin-left:6px;opacity:0;transform:scale(.5);display:inline-block;transition:.25s;}
-  .ex-check.show{opacity:1;transform:scale(1);}
   .ex-scheme{font-family:"Barlow Condensed";font-weight:600;font-size:20px;color:var(--tan);white-space:nowrap;display:flex;align-items:center;gap:6px;}
   .ex-scheme .chev{color:var(--clay);}
   .ex-scheme b{color:var(--cream);font-weight:700;}
@@ -125,12 +123,6 @@
   }
   @keyframes pop{0%{transform:scale(.8);}55%{transform:scale(1.1);}100%{transform:scale(1);}}
   .rep.pop{animation:pop .28s ease;}
-  .setctl{display:flex;flex-direction:column;gap:6px;margin-left:2px;}
-  .mini{
-    width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
-    background:var(--surface);border:1px solid var(--line);color:var(--tan);font-size:18px;line-height:1;transition:.12s;
-  }
-  .mini:active{transform:scale(.85);background:var(--surface2);}
 
   .add-ex{
     width:100%;padding:15px;border-radius:var(--r);border:1.5px dashed var(--line2);
@@ -674,13 +666,10 @@ function render(){
 
     const head = document.createElement("div");
     head.className = "ex-head";
-    head.innerHTML = `<div class="ex-name">${escapeHtml(ex.name)}<span class="ex-check">✓</span></div>
+    head.innerHTML = `<div class="ex-name">${escapeHtml(ex.name)}</div>
       <div class="ex-scheme"><b>${ex.sets.length}×${ex.targetReps}</b> ${loadLabel(ex)} <span class="chev">›</span></div>`;
     head.addEventListener("click", ()=>openExEdit(ei));
     card.appendChild(head);
-    const check = head.querySelector(".ex-check");
-    const refreshCheck = ()=> check.classList.toggle("show", ex.sets.length>0 && ex.sets.every(v=>v!==null));
-    refreshCheck();
 
     const sets = document.createElement("div");
     sets.className = "sets";
@@ -697,23 +686,13 @@ function render(){
           b.classList.add("pop");
           b.addEventListener("animationend", ()=>b.classList.remove("pop"), {once:true});
         }
-        refreshCheck();
         updateProgress();
         save("log "+ex.name);
       });
       sets.appendChild(b);
     });
 
-    const ctl = document.createElement("div");
-    ctl.className = "setctl";
-    const plus = document.createElement("button");
-    plus.className="mini"; plus.textContent="+"; plus.title="Add set";
-    plus.addEventListener("click",(e)=>{ e.stopPropagation(); ex.sets.push(null); save("add set"); render(); });
-    const minus = document.createElement("button");
-    minus.className="mini"; minus.textContent="−"; minus.title="Remove set";
-    minus.addEventListener("click",(e)=>{ e.stopPropagation(); if(ex.sets.length>1){ ex.sets.pop(); save("remove set"); render(); } });
-    ctl.appendChild(plus); ctl.appendChild(minus);
-    sets.appendChild(ctl);
+    // set count is driven by the exercise editor's "Sets" field, not inline +/−
 
     card.appendChild(sets);
     list.appendChild(card);
