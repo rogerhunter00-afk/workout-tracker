@@ -346,7 +346,7 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
+            5,
             null,
             null,
             null,
