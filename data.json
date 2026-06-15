@@ -396,8 +396,8 @@
         },
         {
           "name": "Lat Pulldown",
-          "weight": 32,
-          "targetReps": 5,
+          "weight": 36,
+          "targetReps": 10,
           "bodyweight": false,
           "sets": [
             null,
@@ -493,9 +493,9 @@
         },
         {
           "name": "Lat Pulldown",
-          "weight": 32,
+          "weight": 36,
           "sets": 5,
-          "targetReps": 5,
+          "targetReps": 10,
           "bodyweight": false
         }
       ]
