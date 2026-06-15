@@ -343,7 +343,7 @@
         {
           "name": "Barbell Chest Press",
           "weight": 14,
-          "targetReps": 5,
+          "targetReps": 8,
           "bodyweight": false,
           "sets": [
             5,
@@ -363,7 +363,7 @@
             6,
             5,
             4,
-            null
+            3
           ]
         },
         {
@@ -460,7 +460,7 @@
           "name": "Barbell Chest Press",
           "weight": 14,
           "sets": 5,
-          "targetReps": 5,
+          "targetReps": 8,
           "bodyweight": false
         },
         {
