@@ -553,7 +553,7 @@
         },
         {
           "name": "Cross-Body/Hammer Curls",
-          "weight": 14,
+          "weight": 16,
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
@@ -675,7 +675,7 @@
         },
         {
           "name": "Cross-Body/Hammer Curls",
-          "weight": 14,
+          "weight": 16,
           "sets": 5,
           "targetReps": 5,
           "bodyweight": false
