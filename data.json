@@ -557,8 +557,8 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
-            null,
+            5,
+            3,
             null,
             null,
             null
@@ -570,7 +570,7 @@
           "targetReps": 8,
           "bodyweight": false,
           "sets": [
-            null,
+            8,
             null,
             null,
             null,
