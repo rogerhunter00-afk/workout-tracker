@@ -639,7 +639,7 @@
       "exercises": [
         {
           "name": "Seated Dumbbell Curls",
-          "weight": 16,
+          "weight": 14,
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
@@ -767,7 +767,7 @@
       "exercises": [
         {
           "name": "Seated Dumbbell Curls",
-          "weight": 16,
+          "weight": 14,
           "sets": 5,
           "targetReps": 5,
           "bodyweight": false
