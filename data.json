@@ -682,7 +682,7 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
+            3,
             null,
             null,
             null,
