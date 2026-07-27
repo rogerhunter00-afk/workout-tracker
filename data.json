@@ -1041,10 +1041,10 @@
           ]
         },
         {
-          "name": "New exercise",
-          "weight": 0,
+          "name": "Lateral Raises",
+          "weight": 8,
           "bodyweight": false,
-          "targetReps": 5,
+          "targetReps": 10,
           "sets": [
             null,
             null,
