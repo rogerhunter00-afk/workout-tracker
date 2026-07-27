@@ -944,8 +944,8 @@
       ]
     },
     "2026-07-27": {
-      "label": "Normal Day",
-      "routineId": "rmqbcbvvgifec",
+      "label": "Normal Day plus Lat",
+      "routineId": "rms3grc6bgpt6",
       "exercises": [
         {
           "name": "Seated Dumbbell Curls",
@@ -1085,8 +1085,8 @@
       ]
     },
     {
-      "id": "rmqbcbvvgifec",
-      "name": "Normal Day",
+      "id": "rms3grc6bgpt6",
+      "name": "Normal Day plus Lat",
       "exercises": [
         {
           "name": "Seated Dumbbell Curls",
@@ -1143,9 +1143,16 @@
           "sets": 5,
           "targetReps": 10,
           "bodyweight": false
+        },
+        {
+          "name": "Lateral Raises",
+          "weight": 8,
+          "sets": 5,
+          "targetReps": 10,
+          "bodyweight": false
         }
       ]
     }
   ],
-  "lastRoutineId": "rmqbcbvvgifec"
+  "lastRoutineId": "rms3grc6bgpt6"
 }
