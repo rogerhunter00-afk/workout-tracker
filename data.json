@@ -962,7 +962,7 @@
         },
         {
           "name": "Cross-Body/Hammer Curls",
-          "weight": 14,
+          "weight": 16,
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
@@ -975,7 +975,7 @@
         },
         {
           "name": "Barbell Chest Press",
-          "weight": 14,
+          "weight": 16,
           "targetReps": 8,
           "bodyweight": false,
           "sets": [
@@ -1084,14 +1084,14 @@
         },
         {
           "name": "Cross-Body/Hammer Curls",
-          "weight": 14,
+          "weight": 16,
           "sets": 5,
           "targetReps": 5,
           "bodyweight": false
         },
         {
           "name": "Barbell Chest Press",
-          "weight": 14,
+          "weight": 16,
           "sets": 5,
           "targetReps": 8,
           "bodyweight": false
