@@ -1047,7 +1047,7 @@
           "targetReps": 10,
           "sets": [
             10,
-            null,
+            8,
             null,
             null,
             null
