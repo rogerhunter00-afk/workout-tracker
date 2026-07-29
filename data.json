@@ -1164,6 +1164,19 @@
             null,
             null
           ]
+        },
+        {
+          "name": "New exercise",
+          "weight": 0,
+          "bodyweight": false,
+          "targetReps": 5,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
         }
       ]
     }
