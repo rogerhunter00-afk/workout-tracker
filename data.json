@@ -1100,11 +1100,11 @@
         },
         {
           "name": "Overhead Dumbbell Tricep Extensions",
-          "weight": 10,
+          "weight": 12,
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
+            2,
             null,
             null,
             null,
@@ -1223,7 +1223,7 @@
         },
         {
           "name": "Overhead Dumbbell Tricep Extensions",
-          "weight": 10,
+          "weight": 12,
           "sets": 5,
           "targetReps": 5,
           "bodyweight": false
