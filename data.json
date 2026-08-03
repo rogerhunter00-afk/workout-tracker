@@ -1314,7 +1314,7 @@
           "sets": [
             5,
             5,
-            null,
+            5,
             null,
             null
           ]
@@ -1393,7 +1393,7 @@
           "bodyweight": false,
           "sets": [
             10,
-            null,
+            10,
             null,
             null,
             null
