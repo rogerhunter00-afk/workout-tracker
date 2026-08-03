@@ -1286,19 +1286,6 @@
             10,
             10
           ]
-        },
-        {
-          "name": "New exercise",
-          "weight": 0,
-          "bodyweight": false,
-          "targetReps": 5,
-          "sets": [
-            null,
-            null,
-            null,
-            null,
-            null
-          ]
         }
       ]
     },
@@ -1312,7 +1299,7 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
+            5,
             null,
             null,
             null,
@@ -1351,7 +1338,7 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
+            5,
             null,
             null,
             null,
