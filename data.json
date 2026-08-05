@@ -1424,8 +1424,8 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
-            null,
+            5,
+            5,
             null,
             null,
             null
@@ -1500,12 +1500,12 @@
         },
         {
           "name": "Lateral Raises",
-          "weight": 8,
+          "weight": 10,
           "targetReps": 10,
           "bodyweight": false,
           "sets": [
             10,
-            null,
+            10,
             null,
             null,
             null
@@ -1604,7 +1604,7 @@
         },
         {
           "name": "Lateral Raises",
-          "weight": 8,
+          "weight": 10,
           "sets": 5,
           "targetReps": 10,
           "bodyweight": false
