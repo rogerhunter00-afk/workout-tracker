@@ -1512,11 +1512,14 @@
           ]
         },
         {
-          "name": "New exercise",
-          "weight": 0,
+          "name": "Preachers",
+          "weight": 22,
           "bodyweight": false,
           "targetReps": 5,
           "sets": [
+            5,
+            null,
+            null,
             null,
             null,
             null,
