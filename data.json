@@ -1637,13 +1637,13 @@
           ]
         },
         {
-          "name": "New exercise",
-          "weight": 0,
+          "name": "Standing Side Things",
+          "weight": 30,
           "bodyweight": false,
-          "targetReps": 5,
+          "targetReps": 10,
           "sets": [
-            null,
-            null,
+            10,
+            10,
             null,
             null,
             null
