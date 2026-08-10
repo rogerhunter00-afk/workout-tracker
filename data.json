@@ -1787,7 +1787,7 @@
           "bodyweight": false,
           "sets": [
             4,
-            null,
+            4,
             null,
             null,
             null
