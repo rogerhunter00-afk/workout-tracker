@@ -2012,7 +2012,7 @@
           "sets": [
             5,
             5,
-            null,
+            5,
             null,
             null
           ]
@@ -2024,7 +2024,7 @@
           "bodyweight": false,
           "sets": [
             8,
-            null,
+            6,
             null,
             null,
             null
