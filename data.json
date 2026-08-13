@@ -2116,6 +2116,7 @@
           "bodyweight": false,
           "targetReps": 10,
           "sets": [
+            10,
             null
           ]
         }
