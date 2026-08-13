@@ -2098,13 +2098,13 @@
           ]
         },
         {
-          "name": "New exercise",
-          "weight": 0,
+          "name": "Waiters Curls",
+          "weight": 22,
           "bodyweight": false,
           "targetReps": 5,
           "sets": [
-            null,
-            null,
+            5,
+            5,
             null,
             null,
             null
