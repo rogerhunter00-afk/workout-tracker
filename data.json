@@ -2001,7 +2001,7 @@
             5,
             5,
             4,
-            null
+            4
           ]
         },
         {
@@ -2010,8 +2010,8 @@
           "targetReps": 5,
           "bodyweight": false,
           "sets": [
-            null,
-            null,
+            5,
+            5,
             null,
             null,
             null
