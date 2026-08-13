@@ -2019,11 +2019,11 @@
         },
         {
           "name": "Barbell Chest Press",
-          "weight": 18,
+          "weight": 16,
           "targetReps": 8,
           "bodyweight": false,
           "sets": [
-            null,
+            8,
             null,
             null,
             null,
@@ -2039,8 +2039,8 @@
             5,
             5,
             5,
-            null,
-            null
+            5,
+            5
           ]
         },
         {
@@ -2148,7 +2148,7 @@
         },
         {
           "name": "Barbell Chest Press",
-          "weight": 18,
+          "weight": 16,
           "sets": 5,
           "targetReps": 8,
           "bodyweight": false
