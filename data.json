@@ -2246,8 +2246,8 @@
           ]
         },
         {
-          "name": "New exercise",
-          "weight": 0,
+          "name": "Side Crunches",
+          "weight": 30,
           "bodyweight": false,
           "targetReps": 5,
           "sets": [
