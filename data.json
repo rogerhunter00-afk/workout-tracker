@@ -2233,6 +2233,19 @@
           ]
         },
         {
+          "name": "Preachers",
+          "weight": 24,
+          "bodyweight": false,
+          "targetReps": 5,
+          "sets": [
+            5,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
           "name": "New exercise",
           "weight": 0,
           "bodyweight": false,
