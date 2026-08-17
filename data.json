@@ -2249,12 +2249,9 @@
           "name": "Side Crunches",
           "weight": 30,
           "bodyweight": false,
-          "targetReps": 5,
+          "targetReps": 10,
           "sets": [
-            null,
-            null,
-            null,
-            null,
+            10,
             null
           ]
         }
