@@ -2256,6 +2256,230 @@
           ]
         }
       ]
+    },
+    "2026-08-18": {
+      "label": "Normal Day plus Lat",
+      "routineId": "rms3grc6bgpt6",
+      "exercises": [
+        {
+          "name": "Seated Dumbbell Curls",
+          "weight": 16,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Cross-Body/Hammer Curls",
+          "weight": 16,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Barbell Chest Press",
+          "weight": 16,
+          "targetReps": 8,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Overhead Dumbbell Tricep Extensions",
+          "weight": 14,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Roman Chair Dead-Hang Leg Raises",
+          "weight": 0,
+          "targetReps": 7,
+          "bodyweight": true,
+          "sets": [
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Roman Chair Leg Raises",
+          "weight": 0,
+          "targetReps": 10,
+          "bodyweight": true,
+          "sets": [
+            null
+          ]
+        },
+        {
+          "name": "Gymnast Tucks",
+          "weight": 0,
+          "targetReps": 10,
+          "bodyweight": true,
+          "sets": [
+            null
+          ]
+        },
+        {
+          "name": "Lat Pulldown",
+          "weight": 39,
+          "targetReps": 10,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Lateral Raises",
+          "weight": 12,
+          "targetReps": 10,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ]
+    },
+    "2026-08-19": {
+      "label": "Normal Day plus Lat",
+      "routineId": "rms3grc6bgpt6",
+      "exercises": [
+        {
+          "name": "Seated Dumbbell Curls",
+          "weight": 16,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            5,
+            5,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Cross-Body/Hammer Curls",
+          "weight": 16,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Barbell Chest Press",
+          "weight": 16,
+          "targetReps": 8,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Overhead Dumbbell Tricep Extensions",
+          "weight": 14,
+          "targetReps": 5,
+          "bodyweight": false,
+          "sets": [
+            3,
+            3,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Roman Chair Dead-Hang Leg Raises",
+          "weight": 0,
+          "targetReps": 7,
+          "bodyweight": true,
+          "sets": [
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Roman Chair Leg Raises",
+          "weight": 0,
+          "targetReps": 10,
+          "bodyweight": true,
+          "sets": [
+            null
+          ]
+        },
+        {
+          "name": "Gymnast Tucks",
+          "weight": 0,
+          "targetReps": 10,
+          "bodyweight": true,
+          "sets": [
+            null
+          ]
+        },
+        {
+          "name": "Lat Pulldown",
+          "weight": 39,
+          "targetReps": 10,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "name": "Lateral Raises",
+          "weight": 12,
+          "targetReps": 10,
+          "bodyweight": false,
+          "sets": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ]
     }
   },
   "routines": [
