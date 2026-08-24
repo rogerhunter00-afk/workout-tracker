@@ -2581,10 +2581,10 @@
         {
           "name": "Lateral Raises",
           "weight": 12,
-          "targetReps": 10,
+          "targetReps": 8,
           "bodyweight": false,
           "sets": [
-            null,
+            8,
             null,
             null,
             null,
@@ -2686,7 +2686,7 @@
           "name": "Lateral Raises",
           "weight": 12,
           "sets": 5,
-          "targetReps": 10,
+          "targetReps": 8,
           "bodyweight": false
         }
       ]
