@@ -2492,8 +2492,8 @@
           "bodyweight": false,
           "sets": [
             5,
-            null,
-            null,
+            5,
+            5,
             null,
             null
           ]
@@ -2531,8 +2531,8 @@
           "bodyweight": false,
           "sets": [
             2,
-            null,
-            null,
+            5,
+            5,
             null,
             null
           ]
