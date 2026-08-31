@@ -2802,14 +2802,12 @@
         },
         {
           "name": "Lat Pulldown",
-          "weight": 45,
+          "weight": 52,
           "targetReps": 10,
           "bodyweight": false,
           "sets": [
             10,
-            null,
-            null,
-            null,
+            6,
             null
           ]
         },
@@ -2820,8 +2818,8 @@
           "bodyweight": false,
           "sets": [
             8,
-            8,
-            null,
+            6,
+            6,
             null,
             null
           ]
@@ -2912,8 +2910,8 @@
         },
         {
           "name": "Lat Pulldown",
-          "weight": 45,
-          "sets": 5,
+          "weight": 52,
+          "sets": 3,
           "targetReps": 10,
           "bodyweight": false
         },
