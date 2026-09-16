@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#1c1813; --bg2:#211b15; --surface:#29231c; --surface2:#332b22;
@@ -307,30 +308,25 @@
     </div>
 
     <div class="divider"></div>
-    <p class="seclabel">Backup</p>
+    <p class="seclabel">Cloud sync</p>
 
-    <div id="bkConnected" style="display:none">
-      <p class="muted" id="bkStatus" style="margin-bottom:14px"></p>
+    <div id="cloudConnected" style="display:none">
+      <p class="muted" id="cloudStatus" style="margin-bottom:14px"></p>
       <div class="btn-row">
-        <button class="btn btn-ghost" id="syncNow">Sync now</button>
-        <button class="btn btn-ghost" id="disconnectBtn">Disconnect</button>
-      </div>
-      <div class="btn-row" id="reconnectRow" style="display:none">
-        <button class="btn btn-ghost" id="reconnectBtn">Reconnect GitHub</button>
+        <button class="btn btn-sage" id="cloudSyncNow">Sync now</button>
+        <button class="btn btn-ghost" id="cloudSignOut">Sign out</button>
       </div>
     </div>
 
-    <div id="bkSetup" style="display:none">
-      <p class="muted">Your log is saved on this device. Connect GitHub once and it backs itself up automatically from then on.
-      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token ›</a>
-      (fine-grained, only this repository, Contents read &amp; write), then paste it below.</p>
-      <div class="row2" id="repoFields" style="display:none">
-        <div class="field"><label>Repo owner</label><input id="cfgOwner" placeholder="username" autocomplete="off" /></div>
-        <div class="field"><label>Repo name</label><input id="cfgRepo" placeholder="repository" autocomplete="off" /></div>
+    <div id="cloudSetup">
+      <p class="muted">Your workout log stays on this device and syncs privately through Strongroom Cloud. Sign in once; no GitHub token is needed.</p>
+      <div class="field"><label>Email</label><input id="cloudEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" /></div>
+      <div class="field"><label>Password</label><input id="cloudPassword" type="password" autocomplete="current-password" placeholder="At least 6 characters" /></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="cloudSignIn">Sign in</button>
+        <button class="btn btn-ghost" id="cloudCreate">Create account</button>
       </div>
-      <div class="field"><label>Access token</label><input id="cfgToken" type="password" placeholder="Paste token here" autocomplete="off" /></div>
-      <button class="btn btn-primary" id="connectBtn">Connect</button>
-      <p class="bk-error" id="bkError" style="display:none"></p>
+      <p class="bk-error" id="cloudError" style="display:none"></p>
     </div>
 
     <div class="divider"></div>
@@ -415,9 +411,9 @@
 "use strict";
 /* ============================================================
    Strongroom — personal workout tracker
-   Storage: local-first (localStorage is the source of truth);
-   optional GitHub backup mirrors it to data.json in this repo,
-   debounced so a session is one commit, not one per tap.
+   Storage: local-first (localStorage is the immediate source of truth);
+   optional Strongroom Cloud sync mirrors it privately to Supabase.
+   The app remains usable offline and syncs again when connectivity returns.
    Falls back to in-memory if browser storage is unavailable.
    ============================================================ */
 
@@ -454,17 +450,22 @@ function seed(){
 
 // ---- app state ----
 let DATA = store.get("wt_data") || seed();
-let CFG  = store.get("wt_cfg")  || {owner:"",repo:"",branch:"main",token:""};
-let SHA  = store.get("wt_sha")  || null;       // github file sha for updates
-let dirty = !!store.get("wt_dirty");           // local changes not yet backed up
+let dirty = !!store.get("wt_dirty");           // local changes not yet in Strongroom Cloud
 let lastSync = store.get("wt_lastsync") || null;
 let lastSyncError = null;
-let lastSyncStatus = null;
-let syncRetryTimer = null;
-let syncRetryAttempt = 0;
 let cur  = todayKey();                          // current day key
 let calMonth = new Date();                       // calendar view month
 let editingIdx = null;                           // exercise being edited
+
+const SB_URL = "https://hkxgkbdrazktzmuujeqq.supabase.co";
+const SB_KEY = "sb_publishable_0Su_8qOrteBTkEdLxCWDbA_9Ez-N-IT";
+const SB = (window.supabase && window.supabase.createClient)
+  ? window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}})
+  : null;
+let CLOUD_USER = null;
+let cloudTimer = null;
+let cloudRetryTimer = null;
+let cloudBusy = false;
 
 const $ = s => document.querySelector(s);
 const el = (id) => document.getElementById(id);
@@ -566,128 +567,25 @@ function renderRoutines(){
   });
 }
 
-// ---- persistence: local-first; the GitHub backup is async and debounced ----
+// ---- persistence: local-first; Supabase sync is asynchronous ----
 function persistLocal(){ store.set("wt_data", DATA); }
-let pushTimer = null, pushReasons = [];
+
 function save(reason){
   persistLocal();
   dirty = true; store.set("wt_dirty", true);
-  if(!isConfigured()) return;
-  if(reason) pushReasons.push(reason);
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(()=>flushPush(), 2500);  // batch a burst of taps, but sync before a quick app switch
-}
-async function flushPush(opts){
-  clearTimeout(pushTimer); pushTimer = null;
-  if(!isConfigured() || !dirty) return true;
-  let msg = pushReasons[0] || "update";
-  if(pushReasons.length>1) msg += " (+"+(pushReasons.length-1)+" more)";
-  pushReasons = [];
-  return await push(msg, opts);
-}
-
-// Safari/Chromium keepalive requests have a small body budget. Once the
-// workout archive grows past it, rely on the normal foreground retry instead
-// of attempting a background request that the browser will reject.
-function backupBytes(){
-  try{ return new Blob([JSON.stringify(DATA,null,2)]).size; }
-  catch(_){ return Infinity; }
-}
-function canKeepalive(){ return backupBytes() < 60*1024; }
-function resetSyncRetry(){
-  clearTimeout(syncRetryTimer); syncRetryTimer = null; syncRetryAttempt = 0;
-}
-function shouldAutoRetry(){
-  return !lastSyncStatus || lastSyncStatus===408 || lastSyncStatus===429 || lastSyncStatus>=500;
-}
-function scheduleSyncRetry(){
-  if(!isConfigured() || !dirty || !shouldAutoRetry()) return;
-  clearTimeout(syncRetryTimer);
-  const delays = [15000,30000,60000,120000,300000];
-  const delay = delays[Math.min(syncRetryAttempt, delays.length-1)];
-  syncRetryAttempt++;
-  syncRetryTimer = setTimeout(()=>{
-    syncRetryTimer = null;
-    if(navigator.onLine!==false) syncCycle(true);
-  }, delay);
-}
-function syncProblemText(){
-  if(lastSyncStatus===401) return "GitHub access expired or was revoked — reconnect with a new token.";
-  if(lastSyncStatus===403) return "GitHub refused write access — reconnect a token with Contents read & write.";
-  if(lastSyncStatus===404) return "The GitHub backup could not be accessed — reconnect the repository token.";
-  if(lastSyncStatus===429) return "GitHub is rate-limiting requests — retrying automatically.";
-  if(lastSyncStatus && lastSyncStatus>=500) return "GitHub is temporarily unavailable — retrying automatically.";
-  if(lastSyncError) return "GitHub could not be reached — retrying automatically.";
-  return "Backup needs attention.";
-}
-async function syncCycle(silent){
-  if(!isConfigured()) return false;
-  const pulled = await pullRemote(true);
-  if(!pulled && lastSyncStatus && (lastSyncStatus===401 || lastSyncStatus===403 || lastSyncStatus===404)){
-    if(!silent) toast(syncProblemText());
-    return false;
-  }
-  if(dirty){
-    const pushed = await flushPush();
-    if(!silent) toast(pushed ? "Up to date" : syncProblemText());
-    return !!pushed;
-  }
-  if(!silent) toast(pulled ? "Up to date" : syncProblemText());
-  return !!pulled;
-}
-
-// Best-effort background flush for small backups; larger archives are retried
-// automatically as soon as the app is foregrounded or the network returns.
-addEventListener("pagehide", ()=>{ if(canKeepalive()) flushPush({keepalive:true}); });
-document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState==="hidden"){
-    if(canKeepalive()) flushPush({keepalive:true});
-  } else if(isConfigured()){
-    syncCycle(true);
-  }
-});
-addEventListener("online", ()=>{ if(isConfigured()) syncCycle(true); });
-
-// ---- GitHub backup ----
-function isConfigured(){ return !!(CFG.owner && CFG.repo && CFG.token); }
-function ghHeaders(){ return {Authorization:"Bearer "+CFG.token, Accept:"application/vnd.github+json"}; }
-function ghUrl(){ return `https://api.github.com/repos/${CFG.owner}/${CFG.repo}/contents/data.json`; }
-function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
-function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
-
-// The app is served from <owner>.github.io/<repo>/ — read both straight off the URL
-function detectRepo(){
-  const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
-  if(!m) return null;
-  const seg = location.pathname.split("/").filter(Boolean);
-  return {owner:m[1], repo: seg.length ? seg[0] : m[1]+".github.io"};
-}
-
-function ghError(status){
-  const e = new Error("HTTP "+status);
-  e.status = status;
-  return e;
-}
-async function fetchRemote(){
-  const r = await fetch(ghUrl()+"?ref="+(CFG.branch||"main")+"&t="+Date.now(), {headers:ghHeaders(), cache:"no-store"});
-  // A genuinely new backup has no SHA. If we previously had one, a 404 more
-  // likely means the token/repository access changed and should be surfaced.
-  if(r.status===404 && !SHA) return {sha:null, data:null};
-  if(!r.ok) throw ghError(r.status);
-  const j = await r.json();
-  return {sha:j.sha, data:JSON.parse(b64decode(j.content))};
+  if(CLOUD_USER) scheduleCloudSync(1800);
 }
 
 function filledSets(wk){ return wk.exercises.reduce((a,ex)=>a+ex.sets.filter(v=>v!==null).length,0); }
 function hasLocalLog(){ return Object.keys(DATA.workouts).some(k=>filledSets(DATA.workouts[k])>0); }
 
-// day-level merge so a conflict never loses a logged day from either side;
-// per day the copy with more logged sets wins (ties go to this device)
+// Merge is intentionally conservative: routines are unioned and, when two
+// copies contain the same day, the copy with more logged sets wins. Ties stay
+// local so a tap made on this device is never silently discarded.
 function mergeData(local, remote){
   if(!remote) return local;
   const out = JSON.parse(JSON.stringify(remote));
-  out.settings = local.settings;
-  // union routines by id so neither device loses a template it created
+  out.settings = local.settings || remote.settings;
   const byId = {};
   (remote.routines||[]).forEach(r=>byId[r.id]=r);
   (local.routines||[]).forEach(r=>byId[r.id]=r);
@@ -695,6 +593,7 @@ function mergeData(local, remote){
   if(merged.length) out.routines = merged;
   out.lastRoutineId = local.lastRoutineId || remote.lastRoutineId;
   delete out.templates;
+  out.workouts ||= {};
   Object.keys(local.workouts||{}).forEach(k=>{
     const r = out.workouts[k];
     if(!r || filledSets(local.workouts[k]) >= filledSets(r)) out.workouts[k] = local.workouts[k];
@@ -702,127 +601,172 @@ function mergeData(local, remote){
   return out;
 }
 
-async function pullRemote(silent){
-  if(!isConfigured()) return false;
+function ensureMayLeanRoutine(){
+  ensureRoutines();
+  if(DATA.routines.some(r=>r.id==="maylean2027" || r.name==="May Lean — Full Body")) return false;
+  DATA.routines.push({
+    id:"maylean2027", name:"May Lean — Full Body", exercises:[
+      {name:"Barbell Chest Press", weight:16, sets:3, targetReps:8, bodyweight:false},
+      {name:"Lat Pulldown", weight:45, sets:3, targetReps:8, bodyweight:false},
+      {name:"Leg Press (feet slightly higher)", weight:0, sets:3, targetReps:10, bodyweight:false},
+      {name:"Seated Hip Abduction", weight:0, sets:3, targetReps:12, bodyweight:false},
+      {name:"Lateral Raises", weight:10, sets:3, targetReps:12, bodyweight:false},
+      {name:"Seated Dumbbell Curls", weight:16, sets:2, targetReps:6, bodyweight:false},
+      {name:"Overhead Dumbbell Tricep Extensions", weight:10, sets:2, targetReps:8, bodyweight:false}
+    ]
+  });
+  persistLocal();
+  dirty = true; store.set("wt_dirty", true);
+  return true;
+}
+
+function relTime(ts){
+  const sec = Math.floor((Date.now()-ts)/1000);
+  if(sec<60) return "just now";
+  if(sec<3600) return Math.floor(sec/60)+" min ago";
+  if(sec<86400) return Math.floor(sec/3600)+" h ago";
+  return shortDate(keyOf(new Date(ts)));
+}
+function cloudError(msg){
+  const e = el("cloudError");
+  if(!e) return;
+  if(msg){ e.textContent=msg; e.style.display=""; }
+  else { e.textContent=""; e.style.display="none"; }
+}
+function renderCloud(){
+  const connected=el("cloudConnected"), setup=el("cloudSetup"), status=el("cloudStatus");
+  if(!connected || !setup) return;
+  if(!SB){
+    connected.style.display="none"; setup.style.display="";
+    cloudError("Cloud sync library could not load. Your workout log is still safe on this device.");
+    return;
+  }
+  if(CLOUD_USER){
+    connected.style.display=""; setup.style.display="none";
+    cloudError(null);
+    const who = CLOUD_USER.email ? " · "+escapeHtml(CLOUD_USER.email) : "";
+    if(cloudBusy) status.innerHTML=`<span class="sync-dot"></span> Syncing${who}…`;
+    else if(lastSyncError) status.innerHTML=`<span class="sync-dot off"></span> Cloud sync issue — your log is safe on this device and will retry${who}.`;
+    else if(dirty) status.innerHTML=`<span class="sync-dot"></span> Waiting to sync${who}…`;
+    else status.innerHTML=`<span class="sync-dot on"></span> Synced to Strongroom Cloud${who}${lastSync?" · "+relTime(lastSync):""}`;
+  } else {
+    connected.style.display="none"; setup.style.display="";
+  }
+}
+
+function scheduleCloudSync(delay){
+  clearTimeout(cloudTimer);
+  cloudTimer=setTimeout(()=>{ cloudTimer=null; cloudSync(true); }, delay||1800);
+}
+function scheduleCloudRetry(){
+  if(!CLOUD_USER || !dirty) return;
+  clearTimeout(cloudRetryTimer);
+  cloudRetryTimer=setTimeout(()=>{
+    cloudRetryTimer=null;
+    if(navigator.onLine!==false) cloudSync(true);
+  }, 30000);
+}
+
+async function cloudPush(){
+  if(!SB || !CLOUD_USER) return false;
+  const {error} = await SB.from("strongroom_state").upsert(
+    {user_id:CLOUD_USER.id, data:DATA},
+    {onConflict:"user_id"}
+  );
+  if(error) throw error;
+  dirty=false; store.set("wt_dirty", false);
+  lastSync=Date.now(); store.set("wt_lastsync", lastSync);
+  lastSyncError=null;
+  // Supabase is now the backup. Remove the old GitHub PAT from this browser
+  // only after the first cloud write succeeds.
+  store.set("wt_cfg", {owner:"",repo:"",branch:"main",token:""});
+  store.set("wt_sha", null);
+  return true;
+}
+
+async function cloudSync(silent){
+  if(!SB || !CLOUD_USER || cloudBusy) return false;
+  cloudBusy=true; renderCloud();
   try{
-    const remote = await fetchRemote();
-    SHA = remote.sha; store.set("wt_sha", SHA);
-    if(remote.data){
-      DATA = (dirty || hasLocalLog()) ? mergeData(DATA, remote.data) : remote.data;
+    const localWasDirty=dirty;
+    const {data:row,error} = await SB.from("strongroom_state")
+      .select("data,updated_at")
+      .eq("user_id", CLOUD_USER.id)
+      .maybeSingle();
+    if(error) throw error;
+
+    if(row && row.data){
+      DATA = localWasDirty ? mergeData(DATA, row.data) : row.data;
+      ensureRoutines(); ensureMayLeanRoutine();
       persistLocal(); render();
     }
-    lastSyncError = null; lastSyncStatus = null;
-    renderBackup();
+
+    if(!row || localWasDirty || dirty) await cloudPush();
+    else {
+      lastSync=Date.now(); store.set("wt_lastsync", lastSync);
+      lastSyncError=null;
+    }
+    clearTimeout(cloudRetryTimer); cloudRetryTimer=null;
     if(!silent) toast("Up to date");
     return true;
   }catch(e){
-    lastSyncError = e.message; lastSyncStatus = e.status || 0;
-    renderBackup(); scheduleSyncRetry();
-    if(!silent) toast(syncProblemText());
+    lastSyncError=e.message || String(e);
+    scheduleCloudRetry();
+    if(!silent) toast("Cloud sync failed — saved on this device");
     return false;
+  }finally{
+    cloudBusy=false; renderCloud();
   }
 }
 
-async function push(message, opts, isRetry){
-  if(!isConfigured()) return false;
+async function cloudAuth(mode){
+  cloudError(null);
+  if(!SB){ cloudError("Cloud sync is unavailable right now."); return; }
+  const email=(el("cloudEmail").value||"").trim();
+  const password=el("cloudPassword").value||"";
+  if(!email){ cloudError("Enter your email address."); return; }
+  if(password.length<6){ cloudError("Use a password of at least 6 characters."); return; }
+  const btn = mode==="create" ? el("cloudCreate") : el("cloudSignIn");
+  const old=btn.textContent; btn.disabled=true; btn.textContent=mode==="create"?"Creating…":"Signing in…";
   try{
-    const body = {
-      message:"workout: "+(message||"update")+" ("+todayKey()+")",
-      content: b64encode(JSON.stringify(DATA,null,2)),
-      branch: CFG.branch||"main"
-    };
-    if(SHA) body.sha = SHA;
-    const r = await fetch(ghUrl(), {method:"PUT", headers:ghHeaders(), body:JSON.stringify(body), keepalive:!!(opts&&opts.keepalive)});
-    if(r.status===409 || r.status===422){
-      if(isRetry) throw new Error("conflict");
-      // another device pushed first — fold its copy in, then retry once
-      const remote = await fetchRemote();
-      SHA = remote.sha; store.set("wt_sha", SHA);
-      if(remote.data){ DATA = mergeData(DATA, remote.data); persistLocal(); render(); }
-      return push(message, opts, true);
+    const res = mode==="create"
+      ? await SB.auth.signUp({email,password})
+      : await SB.auth.signInWithPassword({email,password});
+    if(res.error) throw res.error;
+    if(mode==="create" && !res.data.session){
+      cloudError("Account created. Check your email to confirm it, then return here and sign in.");
+      return;
     }
-    if(!r.ok) throw ghError(r.status);
-    const j = await r.json();
-    SHA = j.content.sha; store.set("wt_sha", SHA);
-    dirty = false; store.set("wt_dirty", false);
-    lastSync = Date.now(); store.set("wt_lastsync", lastSync);
-    lastSyncError = null; lastSyncStatus = null; resetSyncRetry();
-    renderBackup();
-    return true;
+    CLOUD_USER=res.data.user || (res.data.session&&res.data.session.user) || null;
+    renderCloud();
+    if(CLOUD_USER) await cloudSync(false);
   }catch(e){
-    // data is already safe locally; the Backup status row surfaces the issue
-    lastSyncError = e.message; lastSyncStatus = e.status || 0;
-    renderBackup(); scheduleSyncRetry();
-    return false;
+    cloudError(e.message || "Could not sign in.");
+  }finally{
+    btn.disabled=false; btn.textContent=old;
   }
 }
 
-// ---- backup section UI ----
-function relTime(ts){
-  const s = Math.floor((Date.now()-ts)/1000);
-  if(s<60) return "just now";
-  if(s<3600) return Math.floor(s/60)+" min ago";
-  if(s<86400) return Math.floor(s/3600)+" h ago";
-  return shortDate(keyOf(new Date(ts)));
-}
-function renderBackup(){
-  const con = el("bkConnected"), setup = el("bkSetup");
-  if(!con) return;
-  if(isConfigured()){
-    con.style.display=""; setup.style.display="none";
-    const st = el("bkStatus");
-    const rr = el("reconnectRow");
-    if(rr) rr.style.display = (lastSyncStatus===401 || lastSyncStatus===403 || lastSyncStatus===404) ? "" : "none";
-    if(lastSyncError){
-      st.innerHTML = `<span class="sync-dot off"></span> ${escapeHtml(syncProblemText())} Your log is safe on this device.`;
-    } else if(dirty){
-      st.innerHTML = `<span class="sync-dot"></span> Backing up to ${escapeHtml(CFG.owner+"/"+CFG.repo)}…`;
-    } else {
-      st.innerHTML = `<span class="sync-dot on"></span> Backed up to ${escapeHtml(CFG.owner+"/"+CFG.repo)}${lastSync?" · "+relTime(lastSync):""}`;
-    }
-  } else {
-    con.style.display="none"; setup.style.display="";
-    el("repoFields").style.display = detectRepo() ? "none" : "";
-  }
-}
-function bkError(msg){
-  const e = el("bkError");
-  if(msg){ e.textContent = msg; e.style.display = ""; }
-  else e.style.display = "none";
-}
-
-async function connectGitHub(){
-  bkError(null);
-  const det = detectRepo();
-  const owner = det ? det.owner : el("cfgOwner").value.trim();
-  const repo  = det ? det.repo  : el("cfgRepo").value.trim();
-  const token = el("cfgToken").value.trim();
-  if(!token){ bkError("Paste a token first."); return; }
-  if(!owner || !repo){ bkError("Enter the repo owner and name."); return; }
-  const btn = el("connectBtn"); btn.disabled = true; btn.textContent = "Connecting…";
+async function initCloud(){
+  if(!SB){ renderCloud(); return; }
   try{
-    let r;
-    try{
-      r = await fetch(`https://api.github.com/repos/${owner}/${repo}`,
-        {headers:{Authorization:"Bearer "+token, Accept:"application/vnd.github+json"}});
-    }catch(_){ bkError("Couldn't reach GitHub — check your connection and try again."); return; }
-    if(r.status===401){ bkError("GitHub rejected the token — check it was copied in full and hasn't expired."); return; }
-    if(r.status===403){ bkError("The token doesn't have access to "+owner+"/"+repo+" — grant it this repository."); return; }
-    if(r.status===404){ bkError("Couldn't see "+owner+"/"+repo+" with this token — when creating it, select this repository under Repository access."); return; }
-    if(!r.ok){ bkError("GitHub error (HTTP "+r.status+") — try again in a moment."); return; }
-    const info = await r.json();
-    if(info.permissions && !info.permissions.push){ bkError("The token can only read — it needs Contents read & write."); return; }
-    CFG = {owner, repo, branch:(info.default_branch||"main"), token};
-    store.set("wt_cfg", CFG);
-    await pullRemote(true);          // adopt or merge any existing backup
-    await push("connect backup");    // make sure the backup exists and is current
-    el("cfgToken").value = "";
-    renderBackup();
-    toast("Connected — your log is backed up");
-  } finally {
-    btn.disabled = false; btn.textContent = "Connect";
-  }
+    const {data,error}=await SB.auth.getSession();
+    if(error) throw error;
+    CLOUD_USER=data.session ? data.session.user : null;
+  }catch(e){ lastSyncError=e.message || String(e); }
+  renderCloud();
+  if(CLOUD_USER) await cloudSync(true);
+  SB.auth.onAuthStateChange((_event,session)=>{
+    CLOUD_USER=session ? session.user : null;
+    renderCloud();
+    if(CLOUD_USER) setTimeout(()=>cloudSync(true),0);
+  });
 }
+
+addEventListener("online", ()=>{ if(CLOUD_USER) cloudSync(true); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible" && CLOUD_USER) cloudSync(true);
+});
 
 // ---- rep cycling: null -> targetReps -> targetReps-1 -> … -> 1 -> null ----
 function cycleRep(v, target){ if(v===null||v===undefined) return target||5; if(v<=1) return null; return v-1; }
@@ -1116,7 +1060,7 @@ el("dateCenter").onclick = ()=>{ calMonth = parseKey(cur); renderCalendar(); ope
 
 el("btnSummarise").onclick = ()=> copyText(summariseDay(cur));
 el("btnCalendar").onclick = ()=>{ calMonth=parseKey(cur); renderCalendar(); open("ovCal"); };
-el("btnSettings").onclick = ()=>{ renderUnits(); renderBackup(); bkError(null); open("ovSettings"); };
+el("btnSettings").onclick = ()=>{ renderUnits(); renderCloud(); cloudError(null); open("ovSettings"); };
 
 el("calPrev").onclick=()=>{ calMonth.setMonth(calMonth.getMonth()-1); renderCalendar(); };
 el("calNext").onclick=()=>{ calMonth.setMonth(calMonth.getMonth()+1); renderCalendar(); };
@@ -1160,30 +1104,20 @@ function renderUnits(){
   el("unitLb").classList.toggle("on", DATA.settings.units==="lb");
   el("unitKg").classList.toggle("on", DATA.settings.units==="kg");
 }
-el("connectBtn").onclick=connectGitHub;
-el("reconnectBtn").onclick=()=>{
-  el("bkConnected").style.display="none";
-  el("bkSetup").style.display="";
-  el("cfgOwner").value=CFG.owner||"";
-  el("cfgRepo").value=CFG.repo||"";
-  el("cfgToken").value="";
-  el("repoFields").style.display = detectRepo() ? "none" : "";
-  bkError("Paste a fresh token below. Your workout log will stay on this device while you reconnect.");
-};
-el("syncNow").onclick=async function(){
+el("cloudSignIn").onclick=()=>cloudAuth("signin");
+el("cloudCreate").onclick=()=>cloudAuth("create");
+el("cloudSyncNow").onclick=async function(){
   this.textContent="Syncing…"; this.disabled=true;
-  const ok = await syncCycle(true);
+  await cloudSync(false);
   this.textContent="Sync now"; this.disabled=false;
-  renderBackup();
-  toast(ok && !lastSyncError ? "Up to date" : syncProblemText());
 };
-el("disconnectBtn").onclick=()=>{
-  CFG={owner:"",repo:"",branch:"main",token:""}; store.set("wt_cfg",CFG);
-  SHA=null; store.set("wt_sha",null);
-  lastSyncError=null; lastSyncStatus=null; resetSyncRetry();
-  renderBackup();
-  toast("Disconnected — your log stays on this device");
+el("cloudSignOut").onclick=async()=>{
+  if(SB) await SB.auth.signOut();
+  CLOUD_USER=null;
+  renderCloud();
+  toast("Signed out — your log stays on this device");
 };
+el("closeSettings").onclick=closeAll;
 el("closeSettings").onclick=closeAll;
 el("unitLb").onclick=()=>{ DATA.settings.units="lb"; save("units"); render(); renderUnits(); toast("Units: lb"); };
 el("unitKg").onclick=()=>{ DATA.settings.units="kg"; save("units"); render(); renderUnits(); toast("Units: kg"); };
@@ -1192,10 +1126,10 @@ el("exportPdf").onclick=exportPDF;
 
 // ---- boot ----
 ensureRoutines();   // migrate v1 (flat templates) data into a routine set
+ensureMayLeanRoutine();
 render();
-renderBackup();
-// quietly reconcile and retry any pending local backup on launch
-if(isConfigured()){ syncCycle(true); }
+renderCloud();
+initCloud();
 </script>
 </body>
 </html>
