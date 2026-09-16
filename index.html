@@ -723,7 +723,8 @@ function save(reason){
   if(CLOUD_USER && CLOUD_READY) scheduleCloudSync(1800);
 }
 
-function filledSets(wk){ return wk.exercises.reduce((a,ex)=>a+ex.sets.filter(v=>v!==null).length,0); }
+function isLoggedRep(v){ return typeof v==="number" && Number.isFinite(v) && v>0; }
+function filledSets(wk){ return wk.exercises.reduce((a,ex)=>a+ex.sets.filter(isLoggedRep).length,0); }
 function hasLocalLog(){ return Object.keys(DATA.workouts).some(k=>filledSets(DATA.workouts[k])>0); }
 
 // Merge keeps remote-only days/routines, but any locally edited day wins in
@@ -838,7 +839,7 @@ function hasLoggedData(data){
   if(!data || !data.workouts) return false;
   return Object.keys(data.workouts).some(k=>{
     const w=data.workouts[k];
-    return w && Array.isArray(w.exercises) && w.exercises.some(ex=>Array.isArray(ex.sets)&&ex.sets.some(v=>v!==null));
+    return w && Array.isArray(w.exercises) && w.exercises.some(ex=>Array.isArray(ex.sets)&&ex.sets.some(isLoggedRep));
   });
 }
 function cloneData(v){ return JSON.parse(JSON.stringify(v)); }
@@ -1173,7 +1174,7 @@ function render(){
 // ---- rep ball styling ----
 function isDayComplete(wk){
   let total=0, done=0;
-  wk.exercises.forEach(ex=>{ total+=ex.sets.length; done+=ex.sets.filter(v=>v!==null).length; });
+  wk.exercises.forEach(ex=>{ total+=ex.sets.length; done+=ex.sets.filter(isLoggedRep).length; });
   return total>0 && done===total;
 }
 // on a completed day, sets that hit target go sage; under-target stay clay
@@ -1187,7 +1188,7 @@ function repClass(v, target, dayComplete){
 function updateProgress(){
   const wk = ensureDay(cur);
   let total=0, done=0;
-  wk.exercises.forEach(ex=>{ total+=ex.sets.length; done+=ex.sets.filter(v=>v!==null).length; });
+  wk.exercises.forEach(ex=>{ total+=ex.sets.length; done+=ex.sets.filter(isLoggedRep).length; });
   const wrap = el("dayProgress");
   wrap.style.display = total ? "" : "none";
   el("dayBarFill").style.width = total ? (100*done/total)+"%" : "0%";
@@ -1211,10 +1212,10 @@ function summariseDay(k){
   let totalSets=0, doneSets=0, totalReps=0;
   let out = wk.label+" — "+prettyDate(k)+"\n";
   wk.exercises.forEach(ex=>{
-    const done = ex.sets.filter(v=>v!==null);
+    const done = ex.sets.filter(isLoggedRep);
     const reps = done.reduce((a,b)=>a+b,0);
     totalSets += ex.sets.length; doneSets += done.length; totalReps += reps;
-    const setStr = ex.sets.length ? ex.sets.map(v=>v===null?"–":v).join(" ") : "—";
+    const setStr = ex.sets.length ? ex.sets.map(v=>isLoggedRep(v)?v:"–").join(" ") : "—";
     const tally = ex.sets.length ? "  ("+done.length+"/"+ex.sets.length+" sets"+(reps?", "+reps+" reps":"")+")" : "";
     out += ex.name+" "+loadLabel(ex)+": "+setStr+tally+"\n";
   });
@@ -1225,7 +1226,7 @@ function summariseDay(k){
 function buildReport(){
   const keys = Object.keys(DATA.workouts).filter(k=>{
     const wk=DATA.workouts[k];
-    return wk.exercises.some(ex=>ex.sets.some(v=>v!==null));
+    return wk.exercises.some(ex=>ex.sets.some(isLoggedRep));
   }).sort();
   const u = DATA.settings.units;
   let out = "STRONGROOM — WORKOUT REPORT\n";
@@ -1237,7 +1238,7 @@ function buildReport(){
   const byEx = {};
   keys.forEach(k=>{
     DATA.workouts[k].exercises.forEach(ex=>{
-      const done = ex.sets.filter(v=>v!==null);
+      const done = ex.sets.filter(isLoggedRep);
       if(!done.length) return;
       const reps = done.reduce((a,b)=>a+b,0);
       (byEx[ex.name] ||= []).push({date:k, weight:ex.weight, bw:!!ex.bodyweight, sets:done, reps, vol:ex.bodyweight?0:reps*ex.weight});
@@ -1312,7 +1313,7 @@ function renderCalendar(){
   for(let d=1; d<=days; d++){
     const k = keyOf(new Date(calMonth.getFullYear(), calMonth.getMonth(), d));
     const wk = DATA.workouts[k];
-    const logged = wk && wk.exercises.some(ex=>ex.sets.some(v=>v!==null));
+    const logged = wk && wk.exercises.some(ex=>ex.sets.some(isLoggedRep));
     const c=document.createElement("div");
     c.className="cal-cell"+(logged?" has":"")+(k===todayKey()?" today":"")+(k===cur?" sel":"");
     c.textContent=d;
