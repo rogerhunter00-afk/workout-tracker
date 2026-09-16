@@ -1,0 +1,38 @@
+name: Add Strongroom template reorder
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-template-reorder.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record workout archive hash
+        run: sha256sum data.json > /tmp/data.sha
+      - name: Apply code-only update
+        run: python scripts/add_template_reorder_once.py
+      - name: Validate inline JavaScript
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          s=pathlib.Path('index.html').read_text()
+          scripts=re.findall(r'<script(?: [^>]*)?>(.*?)</script>',s,re.S)
+          pathlib.Path('/tmp/inline.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/inline.js
+      - name: Ensure workout archive was not changed
+        run: sha256sum -c /tmp/data.sha
+      - name: Commit update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Add template exercise reordering"
+          git push
