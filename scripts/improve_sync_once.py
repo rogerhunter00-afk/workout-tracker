@@ -1,0 +1,287 @@
+from pathlib import Path
+
+p = Path("index.html")
+s = p.read_text()
+
+
+def repl(old: str, new: str, label: str) -> None:
+    global s
+    count = s.count(old)
+    if count != 1:
+        raise SystemExit(f"Expected exactly one block for {label}, found {count}")
+    s = s.replace(old, new, 1)
+
+
+repl(
+'''    <div id="bkConnected" style="display:none">
+      <p class="muted" id="bkStatus" style="margin-bottom:14px"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="syncNow">Sync now</button>
+        <button class="btn btn-ghost" id="disconnectBtn">Disconnect</button>
+      </div>
+    </div>''',
+'''    <div id="bkConnected" style="display:none">
+      <p class="muted" id="bkStatus" style="margin-bottom:14px"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="syncNow">Sync now</button>
+        <button class="btn btn-ghost" id="disconnectBtn">Disconnect</button>
+      </div>
+      <div class="btn-row" id="reconnectRow" style="display:none">
+        <button class="btn btn-ghost" id="reconnectBtn">Reconnect GitHub</button>
+      </div>
+    </div>''',
+"backup controls",
+)
+
+repl(
+'''let lastSync = store.get("wt_lastsync") || null;
+let lastSyncError = null;
+let cur  = todayKey();''',
+'''let lastSync = store.get("wt_lastsync") || null;
+let lastSyncError = null;
+let lastSyncStatus = null;
+let syncRetryTimer = null;
+let syncRetryAttempt = 0;
+let cur  = todayKey();''',
+"sync state",
+)
+
+repl(
+'''  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>flushPush(), 4000);  // batch a burst of taps into one commit
+}
+async function flushPush(opts){
+  clearTimeout(pushTimer); pushTimer = null;
+  if(!isConfigured() || !dirty) return;
+  let msg = pushReasons[0] || "update";
+  if(pushReasons.length>1) msg += " (+"+(pushReasons.length-1)+" more)";
+  pushReasons = [];
+  await push(msg, opts);
+}
+// flush a pending backup when the app is closed or backgrounded;
+// refresh from the repo when coming back to the foreground
+addEventListener("pagehide", ()=>{ flushPush({keepalive:true}); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){ flushPush({keepalive:true}); }
+  else if(isConfigured() && !dirty){ pullRemote(true); }
+});''',
+'''  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>flushPush(), 2500);  // batch a burst of taps, but sync before a quick app switch
+}
+async function flushPush(opts){
+  clearTimeout(pushTimer); pushTimer = null;
+  if(!isConfigured() || !dirty) return true;
+  let msg = pushReasons[0] || "update";
+  if(pushReasons.length>1) msg += " (+"+(pushReasons.length-1)+" more)";
+  pushReasons = [];
+  return await push(msg, opts);
+}
+
+// Safari/Chromium keepalive requests have a small body budget. Once the
+// workout archive grows past it, rely on the normal foreground retry instead
+// of attempting a background request that the browser will reject.
+function backupBytes(){
+  try{ return new Blob([JSON.stringify(DATA,null,2)]).size; }
+  catch(_){ return Infinity; }
+}
+function canKeepalive(){ return backupBytes() < 60*1024; }
+function resetSyncRetry(){
+  clearTimeout(syncRetryTimer); syncRetryTimer = null; syncRetryAttempt = 0;
+}
+function shouldAutoRetry(){
+  return !lastSyncStatus || lastSyncStatus===408 || lastSyncStatus===429 || lastSyncStatus>=500;
+}
+function scheduleSyncRetry(){
+  if(!isConfigured() || !dirty || !shouldAutoRetry()) return;
+  clearTimeout(syncRetryTimer);
+  const delays = [15000,30000,60000,120000,300000];
+  const delay = delays[Math.min(syncRetryAttempt, delays.length-1)];
+  syncRetryAttempt++;
+  syncRetryTimer = setTimeout(()=>{
+    syncRetryTimer = null;
+    if(navigator.onLine!==false) syncCycle(true);
+  }, delay);
+}
+function syncProblemText(){
+  if(lastSyncStatus===401) return "GitHub access expired or was revoked — reconnect with a new token.";
+  if(lastSyncStatus===403) return "GitHub refused write access — reconnect a token with Contents read & write.";
+  if(lastSyncStatus===404) return "The GitHub backup could not be accessed — reconnect the repository token.";
+  if(lastSyncStatus===429) return "GitHub is rate-limiting requests — retrying automatically.";
+  if(lastSyncStatus && lastSyncStatus>=500) return "GitHub is temporarily unavailable — retrying automatically.";
+  if(lastSyncError) return "GitHub could not be reached — retrying automatically.";
+  return "Backup needs attention.";
+}
+async function syncCycle(silent){
+  if(!isConfigured()) return false;
+  const pulled = await pullRemote(true);
+  if(!pulled && lastSyncStatus && (lastSyncStatus===401 || lastSyncStatus===403 || lastSyncStatus===404)){
+    if(!silent) toast(syncProblemText());
+    return false;
+  }
+  if(dirty){
+    const pushed = await flushPush();
+    if(!silent) toast(pushed ? "Up to date" : syncProblemText());
+    return !!pushed;
+  }
+  if(!silent) toast(pulled ? "Up to date" : syncProblemText());
+  return !!pulled;
+}
+
+// Best-effort background flush for small backups; larger archives are retried
+// automatically as soon as the app is foregrounded or the network returns.
+addEventListener("pagehide", ()=>{ if(canKeepalive()) flushPush({keepalive:true}); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){
+    if(canKeepalive()) flushPush({keepalive:true});
+  } else if(isConfigured()){
+    syncCycle(true);
+  }
+});
+addEventListener("online", ()=>{ if(isConfigured()) syncCycle(true); });''',
+"local-first sync scheduler",
+)
+
+repl(
+'''async function fetchRemote(){
+  const r = await fetch(ghUrl()+"?ref="+(CFG.branch||"main")+"&t="+Date.now(), {headers:ghHeaders()});
+  if(r.status===404) return {sha:null, data:null};
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const j = await r.json();
+  return {sha:j.sha, data:JSON.parse(b64decode(j.content))};
+}''',
+'''function ghError(status){
+  const e = new Error("HTTP "+status);
+  e.status = status;
+  return e;
+}
+async function fetchRemote(){
+  const r = await fetch(ghUrl()+"?ref="+(CFG.branch||"main")+"&t="+Date.now(), {headers:ghHeaders(), cache:"no-store"});
+  // A genuinely new backup has no SHA. If we previously had one, a 404 more
+  // likely means the token/repository access changed and should be surfaced.
+  if(r.status===404 && !SHA) return {sha:null, data:null};
+  if(!r.ok) throw ghError(r.status);
+  const j = await r.json();
+  return {sha:j.sha, data:JSON.parse(b64decode(j.content))};
+}''',
+"GitHub fetch diagnostics",
+)
+
+repl(
+'''    lastSyncError = null;
+    renderBackup();
+    if(!silent) toast("Up to date");
+    return true;
+  }catch(e){
+    lastSyncError = e.message; renderBackup();
+    if(!silent) toast("Couldn't reach GitHub");
+    return false;
+  }
+}''',
+'''    lastSyncError = null; lastSyncStatus = null;
+    renderBackup();
+    if(!silent) toast("Up to date");
+    return true;
+  }catch(e){
+    lastSyncError = e.message; lastSyncStatus = e.status || 0;
+    renderBackup(); scheduleSyncRetry();
+    if(!silent) toast(syncProblemText());
+    return false;
+  }
+}''',
+"pull error handling",
+)
+
+repl(
+'''    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j = await r.json();
+    SHA = j.content.sha; store.set("wt_sha", SHA);
+    dirty = false; store.set("wt_dirty", false);
+    lastSync = Date.now(); store.set("wt_lastsync", lastSync);
+    lastSyncError = null;
+    renderBackup();
+    return true;
+  }catch(e){
+    // data is already safe locally; the Backup status row surfaces the issue
+    lastSyncError = e.message;
+    renderBackup();
+    return false;
+  }
+}''',
+'''    if(!r.ok) throw ghError(r.status);
+    const j = await r.json();
+    SHA = j.content.sha; store.set("wt_sha", SHA);
+    dirty = false; store.set("wt_dirty", false);
+    lastSync = Date.now(); store.set("wt_lastsync", lastSync);
+    lastSyncError = null; lastSyncStatus = null; resetSyncRetry();
+    renderBackup();
+    return true;
+  }catch(e){
+    // data is already safe locally; the Backup status row surfaces the issue
+    lastSyncError = e.message; lastSyncStatus = e.status || 0;
+    renderBackup(); scheduleSyncRetry();
+    return false;
+  }
+}''',
+"push error handling",
+)
+
+repl(
+'''    if(lastSyncError){
+      st.innerHTML = `<span class="sync-dot off"></span> Backup issue — your log is saved on this device and will retry.`;
+    } else if(dirty){''',
+'''    const rr = el("reconnectRow");
+    if(rr) rr.style.display = (lastSyncStatus===401 || lastSyncStatus===403 || lastSyncStatus===404) ? "" : "none";
+    if(lastSyncError){
+      st.innerHTML = `<span class="sync-dot off"></span> ${escapeHtml(syncProblemText())} Your log is safe on this device.`;
+    } else if(dirty){''',
+"backup status detail",
+)
+
+repl(
+'''el("connectBtn").onclick=connectGitHub;
+el("syncNow").onclick=async function(){
+  this.textContent="Syncing…"; this.disabled=true;
+  const ok = await pullRemote(true);
+  if(dirty) await flushPush();
+  this.textContent="Sync now"; this.disabled=false;
+  renderBackup();
+  toast(ok && !lastSyncError ? "Up to date" : "Couldn't reach GitHub — saved on this device");
+};''',
+'''el("connectBtn").onclick=connectGitHub;
+el("reconnectBtn").onclick=()=>{
+  el("bkConnected").style.display="none";
+  el("bkSetup").style.display="";
+  el("cfgOwner").value=CFG.owner||"";
+  el("cfgRepo").value=CFG.repo||"";
+  el("cfgToken").value="";
+  el("repoFields").style.display = detectRepo() ? "none" : "";
+  bkError("Paste a fresh token below. Your workout log will stay on this device while you reconnect.");
+};
+el("syncNow").onclick=async function(){
+  this.textContent="Syncing…"; this.disabled=true;
+  const ok = await syncCycle(true);
+  this.textContent="Sync now"; this.disabled=false;
+  renderBackup();
+  toast(ok && !lastSyncError ? "Up to date" : syncProblemText());
+};''',
+"settings sync controls",
+)
+
+repl(
+'''  lastSyncError=null;
+  renderBackup();''',
+'''  lastSyncError=null; lastSyncStatus=null; resetSyncRetry();
+  renderBackup();''',
+"disconnect state reset",
+)
+
+repl(
+'''// quietly refresh from the backup on launch if connected
+if(isConfigured()){ pullRemote(true); }''',
+'''// quietly reconcile and retry any pending local backup on launch
+if(isConfigured()){ syncCycle(true); }''',
+"boot sync",
+)
+
+p.write_text(s)
+print("Patched index.html; data.json was not opened or modified")
