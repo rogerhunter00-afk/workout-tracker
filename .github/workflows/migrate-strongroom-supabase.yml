@@ -1,0 +1,49 @@
+name: Migrate Strongroom to Supabase
+
+on:
+  push:
+    paths:
+      - '.github/workflows/migrate-strongroom-supabase.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply code-only migration
+        run: python scripts/migrate_supabase_once.py
+
+      - name: Validate inline JavaScript
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text()
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', s, re.S)
+          inline=[b for b in blocks if b.strip()]
+          if not inline:
+              raise SystemExit('No inline JavaScript found')
+          Path('/tmp/strongroom.js').write_text(inline[-1])
+          PY
+          node --check /tmp/strongroom.js
+
+      - name: Ensure workout backup file was not changed
+        run: git diff --exit-code -- data.json
+
+      - name: Commit Strongroom Supabase migration
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo 'No index change required'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Move Strongroom sync from GitHub to Supabase'
+          git push
