@@ -1,0 +1,57 @@
+name: Add Strongroom May Lean Template
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-may-lean-template.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  add-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Add May Lean Full Body routine
+        shell: bash
+        run: |
+          python <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('data.json')
+          data = json.loads(path.read_text())
+
+          routine = {
+              'id': 'maylean2027',
+              'name': 'May Lean — Full Body',
+              'exercises': [
+                  {'name': 'Barbell Chest Press', 'weight': 16, 'sets': 3, 'targetReps': 8, 'bodyweight': False},
+                  {'name': 'Lat Pulldown', 'weight': 45, 'sets': 3, 'targetReps': 8, 'bodyweight': False},
+                  {'name': 'Leg Press (feet slightly higher)', 'weight': 0, 'sets': 3, 'targetReps': 10, 'bodyweight': False},
+                  {'name': 'Seated Hip Abduction', 'weight': 0, 'sets': 3, 'targetReps': 12, 'bodyweight': False},
+                  {'name': 'Lateral Raises', 'weight': 10, 'sets': 3, 'targetReps': 12, 'bodyweight': False},
+                  {'name': 'Seated Dumbbell Curls', 'weight': 16, 'sets': 2, 'targetReps': 6, 'bodyweight': False},
+                  {'name': 'Overhead Dumbbell Tricep Extensions', 'weight': 10, 'sets': 2, 'targetReps': 8, 'bodyweight': False}
+              ]
+          }
+
+          routines = data.setdefault('routines', [])
+          routines[:] = [
+              r for r in routines
+              if r.get('id') != routine['id'] and r.get('name') != routine['name']
+          ]
+          routines.append(routine)
+
+          path.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+
+          rm .github/workflows/add-may-lean-template.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data.json .github/workflows/add-may-lean-template.yml
+          git commit -m 'Add May Lean Full Body routine'
+          git push
