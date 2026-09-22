@@ -530,6 +530,15 @@ let cloudTimer = null;
 let cloudRetryTimer = null;
 let cloudBusy = false;
 
+// Tiny, read-only database request on each full app load. This keeps the free
+// Supabase project active without touching workout data or requiring a login.
+function pingStrongroomCloud(){
+  if(!SB) return;
+  SB.from("strongroom_keepalive").select("id").eq("id",1).limit(1).then(({error})=>{
+    if(error) console.warn("Strongroom keepalive failed:", error.message||error);
+  });
+}
+
 const THEME_PRESETS = {
   clay:{accent:"#bd6f46", background:"#1c1813", completion:"#8a9a6b"},
   berry:{accent:"#c4778d", background:"#20171c", completion:"#91a477"},
@@ -1448,6 +1457,7 @@ el("exportPdf").onclick=exportPDF;
 ensureRoutines();   // migrate v1 (flat templates) data into a routine set
 render();
 renderCloud();
+pingStrongroomCloud();
 initCloud();
 </script>
 </body>
